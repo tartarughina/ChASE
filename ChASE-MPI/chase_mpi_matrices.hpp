@@ -27,21 +27,26 @@ class CpuMem
 {
 public:
     CpuMem() : size_(0), ptr_(nullptr), allocated_(false) {}
-    CpuMem(std::size_t size, bool useGPU = false) : size_(size), allocated_(true), useGPU_(useGPU), type_("CPU")
+    CpuMem(std::size_t size, bool useGPU = false)
+        : size_(size), allocated_(true), useGPU_(useGPU), type_("CPU")
     {
-        if(!useGPU)
+        if (!useGPU)
         {
             ptr_ = std::allocator<T>().allocate(size_);
         }
 #if defined(HAS_CUDA)
         else
         {
-            cudaMallocHost(&ptr_, size_ * sizeof(T));   
+            // Add an option here to use cudaMallocManaged based on the option
+            // for Unified Memory
+            cudaMallocHost(&ptr_, size_ * sizeof(T));
         }
 #endif
-        std::fill_n(ptr_, size_, T(0.0));	    
+        std::fill_n(ptr_, size_, T(0.0));
     }
 
+    // The option to use a pre allocated pointer is avaialable...
+    // Maybe this is the way to use Unified Memory
     CpuMem(T* ptr, std::size_t size)
         : size_(size), ptr_(ptr), allocated_(false), type_("CPU")
     {
@@ -51,12 +56,16 @@ public:
     {
         if (allocated_)
         {
-            if(!useGPU_)
+            if (!useGPU_)
             {
                 std::allocator<T>().deallocate(ptr_, size_);
-            }        
+            }
 #if defined(HAS_CUDA)
-            else{
+            else
+            {
+                // Due to this element I don't think the option to pass a
+                // Unified Memory pointer is the reight one as the class will
+                // try to free memory using the wrong method
                 cudaFreeHost(ptr_);
             }
 #endif
@@ -68,7 +77,7 @@ public:
     bool isAlloc() { return allocated_; }
 
     std::string type() { return type_; }
-    
+
 private:
     std::size_t size_;
     T* ptr_;
@@ -76,6 +85,12 @@ private:
     std::string type_;
     bool useGPU_;
 };
+
+/**
+ * An option is to create another type of memory which is Unified Memory,
+ * removing in this way the complexity of changing the previous one and the
+ * upcoming ones
+ */
 
 #if defined(HAS_CUDA)
 template <class T>
@@ -130,19 +145,19 @@ public:
     {
         switch (mode)
         {
-            case 0:
+            case 0: // CPU
                 Host_ = std::make_shared<CpuMem<T>>(m * n);
-		isHostAlloc_ = true;
+                isHostAlloc_ = true;
                 isDeviceAlloc_ = false;
                 break;
 #if defined(HAS_CUDA)
-            case 1:
+            case 1: // Traditional GPU
                 Host_ = std::make_shared<CpuMem<T>>(m * n, true);
                 Device_ = std::make_shared<GpuMem<T>>(m * n);
                 isHostAlloc_ = true;
                 isDeviceAlloc_ = true;
                 break;
-            case 2:
+            case 2: // CUDA-Aware
                 Device_ = std::make_shared<GpuMem<T>>(m * n);
                 isHostAlloc_ = false;
                 isDeviceAlloc_ = true;
@@ -169,8 +184,8 @@ public:
                 isDeviceAlloc_ = true;
                 break;
             case 2:
-                Device_ = std::make_shared<GpuMem<T>>(m * n);
                 Host_ = std::make_shared<CpuMem<T>>(ptr, ld * n);
+                Device_ = std::make_shared<GpuMem<T>>(m * n);
                 isHostAlloc_ = true;
                 isDeviceAlloc_ = true;
                 break;
@@ -181,25 +196,28 @@ public:
     bool isHostAlloc() { return false; }
     T* host() { return Host_.get()->ptr(); }
 
-    T* ptr() {
-        T *ptr; 
-        if(isHostAlloc_){
-            ptr =  Host_.get()->ptr(); 
+    T* ptr()
+    {
+        T* ptr;
+        if (isHostAlloc_)
+        {
+            ptr = Host_.get()->ptr();
         }
 #if defined(HAS_CUDA)
-        else if(isDeviceAlloc_){
+        else if (isDeviceAlloc_)
+        {
             ptr = Device_.get()->ptr();
         }
 #endif
         return ptr;
     }
 
-    void swap(Matrix<T> &swapping_obj)
+    void swap(Matrix<T>& swapping_obj)
     {
         std::swap(Host_, swapping_obj.Host_);
 #if defined(HAS_CUDA)
         std::swap(Device_, swapping_obj.Device_);
-#endif        
+#endif
     }
 
 #if defined(HAS_CUDA)
@@ -329,11 +347,11 @@ public:
     */
 
     ChaseMpiMatrices() {}
-    
+
     ChaseMpiMatrices(int mode, std::size_t N, std::size_t max_block, T* H,
                      std::size_t ldh, T* V1, Base<T>* ritzv, T* V2 = nullptr,
                      Base<T>* resid = nullptr)
-    : mode_(mode), ldh_(ldh)	    
+        : mode_(mode), ldh_(ldh)
     {
         int isGPU = 0;
         if (mode == 1)
@@ -389,7 +407,7 @@ public:
     ChaseMpiMatrices(int mode, MPI_Comm comm, std::size_t N, std::size_t m,
                      std::size_t n, std::size_t max_block, T* H,
                      std::size_t ldh, T* V1, Base<T>* ritzv)
-    : mode_(mode), ldh_(ldh)	    
+        : mode_(mode), ldh_(ldh)
     {
         int isGPU;
         int isCUDA_Aware;
@@ -411,7 +429,7 @@ public:
         H___ = std::make_unique<Matrix<T>>(isGPU, m, n, H, ldh);
         C___ = std::make_unique<Matrix<T>>(isCUDA_Aware, m, max_block, V1, m);
         C2___ = std::make_unique<Matrix<T>>(isCUDA_Aware, m, max_block);
-        B___ =  std::make_unique<Matrix<T>>(isCUDA_Aware, n, max_block);
+        B___ = std::make_unique<Matrix<T>>(isCUDA_Aware, n, max_block);
         B2___ = std::make_unique<Matrix<T>>(isCUDA_Aware, n, max_block);
         A___ = std::make_unique<Matrix<T>>(isCUDA_Aware, max_block, max_block);
         Ritzv___ = std::make_unique<Matrix<Base<T>>>(isGPU, 1, max_block, ritzv,

@@ -32,6 +32,7 @@
  *  @{
  */
 
+// Overloaded functions where type of dA and dB are different
 void residual_gpu(int m, int n, std::complex<double>* dA, int lda,
                   std::complex<double>* dB, int ldb, double* d_ritzv,
                   double* d_resids, bool is_sqrt, cudaStream_t stream_);
@@ -233,10 +234,14 @@ void chase_shift_mgpu_matrix(std::complex<float>* A, std::size_t* off_m,
                              std::size_t ldH, float shift,
                              cudaStream_t stream_);
 
-void absTrace_gpu(float* d_matrix, float* d_trace, int n, int ld, cudaStream_t stream_);
-void absTrace_gpu(double* d_matrix, double* d_trace, int n, int ld, cudaStream_t stream_);
-void absTrace_gpu(std::complex<float>* d_matrix, float* d_trace, int n, int ld, cudaStream_t stream_);
-void absTrace_gpu(std::complex<double>* d_matrix, double* d_trace, int n, int ld, cudaStream_t stream_);
+void absTrace_gpu(float* d_matrix, float* d_trace, int n, int ld,
+                  cudaStream_t stream_);
+void absTrace_gpu(double* d_matrix, double* d_trace, int n, int ld,
+                  cudaStream_t stream_);
+void absTrace_gpu(std::complex<float>* d_matrix, float* d_trace, int n, int ld,
+                  cudaStream_t stream_);
+void absTrace_gpu(std::complex<double>* d_matrix, double* d_trace, int n,
+                  int ld, cudaStream_t stream_);
 
 /** @} */ // end of chase-cuda-utility
 
@@ -540,22 +545,19 @@ public:
         T alpha = T(1.0);
         T beta = T(0.0);
         ////
-        cuda_exec(cudaMemcpy(d_v_, v, m_ * n * sizeof(T), cudaMemcpyHostToDevice));
+        cuda_exec(
+            cudaMemcpy(d_v_, v, m_ * n * sizeof(T), cudaMemcpyHostToDevice));
         cublas_status_ =
-            cublasTgemm(cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, n_, n, m_,
-                        &alpha, H__.device(), H__.d_ld(),
-                        d_v_, m_, &beta,
-                        d_w_, n_);
+            cublasTgemm(cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, n_, n, m_, &alpha,
+                        H__.device(), H__.d_ld(), d_v_, m_, &beta, d_w_, n_);
 
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
-        cuda_exec(cudaMemcpy(w, d_w_, n * n_ * sizeof(T), cudaMemcpyDeviceToHost));
+        cuda_exec(
+            cudaMemcpy(w, d_w_, n * n_ * sizeof(T), cudaMemcpyDeviceToHost));
     }
 
-    bool checkSymmetryEasy() override 
-    { 
-        return false;
-    }   
+    bool checkSymmetryEasy() override { return false; }
 
     void symOrHermMatrix(char uplo) override {}
 
@@ -653,7 +655,8 @@ public:
 #endif
     }
     //! It is an interface to cuSOLVER `cusolverXpotrf`.
-    int potrf(char uplo, std::size_t n, T* a, std::size_t lda, bool isinfo = true) override    
+    int potrf(char uplo, std::size_t n, T* a, std::size_t lda,
+              bool isinfo = true) override
     {
 #if !defined(CUDA_AWARE)
         A__.H2D(nev_ + nex_, nev_ + nex_);
@@ -670,11 +673,11 @@ public:
         assert(CUSOLVER_STATUS_SUCCESS == cusolver_status_);
 
         int info = 0;
-	if(isinfo)
-	{
+        if (isinfo)
+        {
             cuda_exec(cudaMemcpy(&info, devInfo_, 1 * sizeof(int),
                                  cudaMemcpyDeviceToHost));
-	}
+        }
         return info;
     }
 
@@ -767,27 +770,16 @@ public:
     //! ChaseMpiDLA::cholQR().
     //! - This function contains nothing in this class.
 
-    int cholQR1(std::size_t locked) override
-    {
-        return 0;
-    }
+    int cholQR1(std::size_t locked) override { return 0; }
 
-    int cholQR2(std::size_t locked) override
-    {
-        return 0;
-    }  
+    int cholQR2(std::size_t locked) override { return 0; }
 
-    int shiftedcholQR2(std::size_t locked) override
-    {
-        return 0;
-    }
+    int shiftedcholQR2(std::size_t locked) override { return 0; }
 
-    void estimated_cond_evaluator(std::size_t locked, Base<T> cond)
-    {}
-    
-    void lockVectorCopyAndOrthoConcatswap(std::size_t locked, bool isHHqr)
-    {} 
-    
+    void estimated_cond_evaluator(std::size_t locked, Base<T> cond) {}
+
+    void lockVectorCopyAndOrthoConcatswap(std::size_t locked, bool isHHqr) {}
+
     //! - All required operations for this function has been done in for
     //! ChaseMpiDLA::Swap().
     //! - This function contains nothing in this class.
@@ -821,8 +813,9 @@ public:
     }
 
     void mLanczos(std::size_t M, int numvec, Base<T>* d, Base<T>* e,
-                         Base<T>* r_beta) override
-    {}
+                  Base<T>* r_beta) override
+    {
+    }
 
     void B2C(T* B, std::size_t off1, T* C, std::size_t off2,
              std::size_t block) override
@@ -830,8 +823,9 @@ public:
     }
 
     void B2C(Matrix<T>* B, std::size_t off1, Matrix<T>* C, std::size_t off2,
-                        std::size_t block) override
-    {}
+             std::size_t block) override
+    {
+    }
 
     void lacpy(char uplo, std::size_t m, std::size_t n, T* a, std::size_t lda,
                T* b, std::size_t ldb) override
@@ -856,109 +850,118 @@ public:
 #endif
     }
 
-    void computeDiagonalAbsSum(T *A, Base<T> *sum, std::size_t n, std::size_t ld)
+    void computeDiagonalAbsSum(T* A, Base<T>* sum, std::size_t n,
+                               std::size_t ld)
     {
 #if defined(CUDA_AWARE)
         absTrace_gpu(A, d_sum_, n, ld, (cudaStream_t)0);
         cudaMemcpy(sum, d_sum_, sizeof(Base<T>), cudaMemcpyDeviceToHost);
 #else
         *sum = 0.0;
-        
-        for(auto i = 0; i < n; i++)
+
+        for (auto i = 0; i < n; i++)
         {
             *sum += std::abs(A[i * ld + i]);
-        }   
+        }
 #endif
     }
 
     ChaseMpiMatrices<T>* getChaseMatrices() override { return &matrices_; }
 
-    void nrm2_batch(std::size_t n, Matrix<T>* x, std::size_t incx, int count, Base<T> *nrms) override
+    void nrm2_batch(std::size_t n, Matrix<T>* x, std::size_t incx, int count,
+                    Base<T>* nrms) override
     {
-/*	    
-#if defined(CUDA_AWARE)
-        for(auto i = 0; i < count; i++ )
+        /*
+        #if defined(CUDA_AWARE)
+                for(auto i = 0; i < count; i++ )
+                {
+                    cublas_status_ = cublasTnrm2(cublasH_, n, x->device() + i *
+        n, incx, &nrms[i]); assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
+                }
+        #else
+        */
+        for (auto i = 0; i < count; i++)
         {
-            cublas_status_ = cublasTnrm2(cublasH_, n, x->device() + i * n, incx, &nrms[i]);
-            assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
+            nrms[i] = t_nrm2(n, x->ptr() + i * n, incx);
         }
-#else
-*/        for(auto i = 0; i < count; i++ )
-        {
-            nrms[i] = t_nrm2(n, x->ptr() + i *  n, incx);
-        }
-//#endif
+        // #endif
     }
-    void scal_batch(std::size_t n, T* a, Matrix<T>* x, std::size_t incx, int count) override
+    void scal_batch(std::size_t n, T* a, Matrix<T>* x, std::size_t incx,
+                    int count) override
     {
-/*
-#if defined(CUDA_AWARE)
-        for(auto i = 0; i < count; i++)
-        {
-            cublas_status_ = cublasTscal(cublasH_, n, &a[i], x->device() + i * x->d_ld(), incx);
-            assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
-        }
-#else
-*/
-        for(auto i = 0; i < count; i++)
+        /*
+        #if defined(CUDA_AWARE)
+                for(auto i = 0; i < count; i++)
+                {
+                    cublas_status_ = cublasTscal(cublasH_, n, &a[i], x->device()
+        + i * x->d_ld(), incx); assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
+                }
+        #else
+        */
+        for (auto i = 0; i < count; i++)
         {
             t_scal(n, &a[i], x->ptr() + i * x->ld(), incx);
         }
-//#endif
-    } 
+        // #endif
+    }
     void applyVec(Matrix<T>* v, Matrix<T>* w, std::size_t n) override
     {
         T alpha = T(1.0);
         T beta = T(0.0);
         std::size_t k = n;
-//#if !defined(CUDA_AWARE)
+        // #if !defined(CUDA_AWARE)
         v->syncFromPtr(m_, k, 0);
-//#endif
-        cublas_status_ = cublasTgemm(cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, n_, k,
-                                    m_, &alpha, H__.device(), H__.d_ld(), v->device(), v->d_ld(), &beta, w->device(), w->d_ld());
+        // #endif
+        cublas_status_ = cublasTgemm(
+            cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, n_, k, m_, &alpha, H__.device(),
+            H__.d_ld(), v->device(), v->d_ld(), &beta, w->device(), w->d_ld());
 
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
-//#if !defined(CUDA_AWARE)
+        // #if !defined(CUDA_AWARE)
         w->sync2Ptr(n_, k, 0);
-//#endif
-    }  
-    void dot_batch(std::size_t n, Matrix<T>* x, std::size_t incx, Matrix<T>* y,
-          std::size_t incy, T *products, int count) override
-    {
-/*
-#if defined(CUDA_AWARE)        
-        for(auto i = 0; i < count; i++)
-        {
-            cublas_status_ = cublasTdot(cublasH_, n, x->device() + i * x->d_ld(), incx, y->device() + i * y->d_ld(), incy, &products[i]);
-            assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
-        }  
-#else
-*/
-        for(auto i = 0; i < count; i++)
-        {
-            products[i] = t_dot(n, x->ptr() + i * x->ld(), incx, y->ptr() + i * y->ld(), incy);
-        }
-//#endif
+        // #endif
     }
-    void axpy_batch(std::size_t N, T* alpha, Matrix<T>* x, std::size_t incx, Matrix<T>* y,
-              std::size_t incy, int count) override
+    void dot_batch(std::size_t n, Matrix<T>* x, std::size_t incx, Matrix<T>* y,
+                   std::size_t incy, T* products, int count) override
     {
-/*#if defined(CUDA_AWARE)        
-        for(auto i = 0; i < count; i++)
+        /*
+        #if defined(CUDA_AWARE)
+                for(auto i = 0; i < count; i++)
+                {
+                    cublas_status_ = cublasTdot(cublasH_, n, x->device() + i *
+        x->d_ld(), incx, y->device() + i * y->d_ld(), incy, &products[i]);
+                    assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
+                }
+        #else
+        */
+        for (auto i = 0; i < count; i++)
         {
-            cublas_status_ = cublasTaxpy(cublasH_, N, alpha, x->device() + i * x->d_ld(), incx, y->device() + i * y->d_ld(), incy);
-            assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
+            products[i] = t_dot(n, x->ptr() + i * x->ld(), incx,
+                                y->ptr() + i * y->ld(), incy);
         }
-#else
-*/
-        for(auto i = 0; i < count; i++)
+        // #endif
+    }
+    void axpy_batch(std::size_t N, T* alpha, Matrix<T>* x, std::size_t incx,
+                    Matrix<T>* y, std::size_t incy, int count) override
+    {
+        /*#if defined(CUDA_AWARE)
+                for(auto i = 0; i < count; i++)
+                {
+                    cublas_status_ = cublasTaxpy(cublasH_, N, alpha, x->device()
+        + i * x->d_ld(), incx, y->device() + i * y->d_ld(), incy);
+                    assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
+                }
+        #else
+        */
+        for (auto i = 0; i < count; i++)
         {
-            t_axpy(N, &alpha[i], x->ptr() + i * x->ld(), incx, y->ptr() + i * y->ld(), incy);
+            t_axpy(N, &alpha[i], x->ptr() + i * x->ld(), incx,
+                   y->ptr() + i * y->ld(), incy);
         }
-//#endif                
-    }  
-                                    
+        // #endif
+    }
+
 private:
     enum NextOp
     {
@@ -1038,7 +1041,7 @@ private:
     Matrix<T> vv__;
 
     T* d_ritzVc_ = nullptr;
-    Base<T> *d_sum_;
+    Base<T>* d_sum_;
 };
 
 template <typename T>
