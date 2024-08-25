@@ -358,7 +358,7 @@ public:
         // Calculate the maximum possible size for the vectors
         std::size_t max_size = mblocks_ *
                                nblocks_ * // maximum potential elements
-                               **c_lens_.begin() * *r_lens_.begin();
+                               *c_lens_.begin() * *r_lens_.begin();
 
         cudaMallocManaged((void**)&d_off_m_, max_size * sizeof(std::size_t));
         cudaMallocManaged((void**)&d_off_n_, max_size * sizeof(std::size_t));
