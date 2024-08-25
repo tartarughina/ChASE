@@ -105,8 +105,8 @@ if(CMAKE_CUDA_COMPILER)
   elseif(${CMAKE_VERSION} VERSION_GREATER "3.18.0")
     find_package(CUDAToolkit REQUIRED)
     # the libraries below have issues compiling with NVHPC
-    # and the CMake version avaialble on Polaris
-    # as a turnaround set them manually
+    # and the CMake version available on Polaris
+    # as a workaround set them manually
     # set(CUDA_CUBLAS_LIBRARIES CUDA::cublas)
     # set(CUDA_cusolver_LIBRARY CUDA::cusolver)
     # set(CUDA_curand_LIBRARY CUDA::curand)
@@ -119,7 +119,7 @@ if(CMAKE_CUDA_COMPILER)
       set (CMAKE_CUDA_ARCHITECTURES "80")
   endif()
 
-  # If cuda compute compatibility of your GPU is 8.6 (e.g. RTX 3090) you should build with
+  # If CUDA compute compatibility of your GPU is 8.6 (e.g. RTX 3090) you should build with
   # -DCMAKE_CUDA_ARCHITECTURES=86. In the case you want to build code for more than one
   # CUDA compute capability (e.g. 70, 75, 80 and 86) then build with
   # -DCMAKE_CUDA_ARCHITECTURES="70;75;80;86"
@@ -128,7 +128,7 @@ if(CMAKE_CUDA_COMPILER)
   # in CMake 3.18) which defines that the variable CMAKE_CUDA_ARCHITECTURES has to be initialized.
   # In that case, the code generation flag has to be set manually.
   # For simplicity and compatibility with newer (3.18+) CMake version, the CMAKE_CUDA_ARCHITECTURES
-  # variable has to be always set, not matter the cmake version.
+  # variable has to be always set, no matter the cmake version.
   if (${CMAKE_VERSION} VERSION_LESS "3.18.0")
     message("CMAKE version less than 3.18. Using old CMAKE CUDA policy for defining CUDA code generation flags")
     foreach(CODE ${CMAKE_CUDA_ARCHITECTURES})
@@ -145,6 +145,7 @@ if(CMAKE_CUDA_COMPILER)
       set(ENABLE_NSIGHT OFF CACHE BOOL "" FORCE)
     endif()
   endif()
+
   add_library( chase_cuda "kernels/shift.cu" )
 
   set_target_properties( chase_cuda
@@ -178,43 +179,42 @@ if(CMAKE_CUDA_COMPILER)
         )
 
   # Enforce that ENABLE_TUNING requires ENABLE_UM
-    if(ENABLE_TUNING AND NOT ENABLE_UM)
-        message(FATAL_ERROR "ENABLE_TUNING requires ENABLE_UM to be ON. Please set -DENABLE_UM=ON.")
-    endif()
+  if(ENABLE_TUNING AND NOT ENABLE_UM)
+      message(FATAL_ERROR "ENABLE_TUNING requires ENABLE_UM to be ON. Please set -DENABLE_UM=ON.")
+  endif()
 
   if(ENABLE_UM)
-    target_compile_definitions( chase_cuda INTERFACE
-            "-DHAS_UM"
-            )
-  endif()
-  if(ENABLE_TUNING)
-    target_compile_definitions( chase_cuda INTERFACE
-            "-DHAS_TUNING"
-            )
-  endif()
-  endif()
-
-if(ENABLE_CUDA_AWARE_MPI)
-  target_compile_definitions( chase_cuda INTERFACE
-          "-DCUDA_AWARE"
-        )
-
-  if(ENABLE_NCCL)
-	find_package( NCCL REQUIRED )
+      target_compile_definitions( chase_cuda INTERFACE
+              "-DHAS_UM"
+              )
+      if(ENABLE_TUNING)
+          target_compile_definitions( chase_cuda INTERFACE
+                  "-DHAS_TUNING"
+                  )
+      endif()
   endif()
 
-  if(NCCL_FOUND)
-    target_link_libraries(chase_cuda INTERFACE
-            ${NCCL_LIBRARIES}
-            )
-    target_include_directories( chase_cuda INTERFACE
-            ${NCCL_INCLUDE_DIRS}
-            )
+  if(ENABLE_CUDA_AWARE_MPI)
     target_compile_definitions( chase_cuda INTERFACE
-            "-DHAS_NCCL"
-        )
+            "-DCUDA_AWARE"
+          )
+
+    if(ENABLE_NCCL)
+  	find_package( NCCL REQUIRED )
+    endif()
+
+    if(NCCL_FOUND)
+      target_link_libraries(chase_cuda INTERFACE
+              ${NCCL_LIBRARIES}
+              )
+      target_include_directories( chase_cuda INTERFACE
+              ${NCCL_INCLUDE_DIRS}
+              )
+      target_compile_definitions( chase_cuda INTERFACE
+              "-DHAS_NCCL"
+          )
+    endif()
   endif()
-endif()
 
   if(ENABLE_NSIGHT)
       target_compile_definitions(chase_cuda INTERFACE USE_NSIGHT)
