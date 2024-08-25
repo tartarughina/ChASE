@@ -17,7 +17,11 @@
 
 #ifdef DRIVER_BUILD_MGPU
 #include "ChASE-MPI/impl/chase_mpidla_cuda_seq.hpp"
+#ifdef HAS_UM
+#include "ChASE-MPI/impl/chase_mpidla_mgpu_um.hpp"
+#else
 #include "ChASE-MPI/impl/chase_mpidla_mgpu.hpp"
+#endif
 #endif
 
 using T = std::complex<double>;
@@ -37,10 +41,9 @@ int main(int argc, char** argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    std::size_t N = 1001; // problem size
+    std::size_t N = 1001;  // problem size
     std::size_t nev = 100; // number of eigenpairs to be computed
-    std::size_t nex = 40; // extra searching space
-
+    std::size_t nex = 40;  // extra searching space
 
     auto props = new ChaseMpiProperties<T>(N, nev, nex, MPI_COMM_WORLD);
 
@@ -84,8 +87,7 @@ int main(int argc, char** argv)
     {
         for (std::size_t y = 0; y < ylen; y++)
         {
-            H[x + xlen * y] =
-                Clement[(xoff + x) * N + (yoff + y)];
+            H[x + xlen * y] = Clement[(xoff + x) * N + (yoff + y)];
         }
     }
 
@@ -100,8 +102,7 @@ int main(int argc, char** argv)
     config.SetMaxIter(25);
     if (rank == 0)
         std::cout << "Solving a symmetrized Clement matrices (" << N << "x" << N
-                  << ")"
-                  << '\n'
+                  << ")" << '\n'
                   << config;
 
     /*Performance Decorator to meaure the performance of kernels of ChASE*/

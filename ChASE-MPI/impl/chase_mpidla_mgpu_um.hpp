@@ -837,7 +837,7 @@ public:
                                std::size_t ld)
     {
         absTrace_gpu(A, d_sum_, n, ld, (cudaStream_t)0);
-        *sum = *d_sum;
+        *sum = *d_sum_;
     }
 
     ChaseMpiMatrices<T>* getChaseMatrices() override { return &matrices_; }
@@ -1017,7 +1017,7 @@ private:
 };
 
 template <typename T>
-struct is_skewed_matrixfree<ChaseMpiDLAMultiGPUUM<T>>
+struct is_skewed_matrixfree<ChaseMpiDLAMultiGPU<T>>
 {
     static const bool value = true;
 };

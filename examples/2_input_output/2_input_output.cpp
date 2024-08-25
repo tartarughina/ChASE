@@ -187,9 +187,22 @@ int do_chase(ChASE_DriverProblemConfig& conf)
     auto ldh_ = N;
 #endif
 
+#ifdef HAS_UM
+    T *V_m, *H_m;
+    Base<T>* Lambda_m;
+    cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
+
+    auto V__ = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
+    auto Lambda__ =
+        std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
+    auto H__ = std::vector<T>(H_m, H_m + ldh_ * n_);
+#else
     auto V__ = std::unique_ptr<T[]>(new T[m_ * (nev + nex)]);
     auto Lambda__ = std::unique_ptr<Base<T>[]>(new Base<T>[(nev + nex)]);
-    auto H__ = std::unique_ptr<T[]>(new T[ldh_ * n_]);
+    auto H__ = std::unique_ptr<T[]>(new T[ldh_ * n_]); // eigevectors
+#endif
 
     T* V = V__.get();
     Base<T>* Lambda = Lambda__.get();
