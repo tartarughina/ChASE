@@ -427,9 +427,14 @@ private:
     std::size_t m_;
     std::size_t n_;
     std::size_t ld_;
+#if defined(HAS_UM)
+    std::shared_ptr<UnifiedMem<T>> Host_;
+    std::shared_ptr<UnifiedMem<T>> Device_;
+#else
     std::shared_ptr<CpuMem<T>> Host_;
 #if defined(HAS_CUDA)
     std::shared_ptr<GpuMem<T>> Device_;
+#endif
 #endif
     bool isHostAlloc_ = false;
     bool isDeviceAlloc_ = false;
