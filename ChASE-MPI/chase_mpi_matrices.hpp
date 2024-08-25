@@ -146,7 +146,7 @@ public:
         cudaMemset(ptr_, 0, size_ * sizeof(T));
     }
 
-    GpuMem(T* ptr, std::size_t size)
+    UnifiedMem(T* ptr, std::size_t size)
         : size_(size), ptr_(ptr), allocated_(false), type_("GPU")
     {
     }

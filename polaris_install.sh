@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cmake .. \
--DCMAKE_INSTALL_PREFIX=/home/tartarughina/ChASE \
+-DCMAKE_INSTALL_PREFIX=/home/tartarughina/ChASE-UM \
 -DBUILD_WITH_EXAMPLES=ON \
 -DNCCL_LIB_DIR=${NVIDIA_PATH}/comm_libs/nccl/lib \
 -DNCCL_INCLUDE_DIR=${NVIDIA_PATH}/comm_libs/nccl/include \

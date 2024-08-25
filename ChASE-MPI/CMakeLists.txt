@@ -184,10 +184,12 @@ if(CMAKE_CUDA_COMPILER)
   endif()
 
   if(ENABLE_UM)
+      message(INFO "Unified Memory (UM) enabled.")
       target_compile_definitions( chase_cuda INTERFACE
               "-DHAS_UM"
               )
       if(ENABLE_TUNING)
+          message(INFO "Unified Memory Tuning (UMT) enabled.")
           target_compile_definitions( chase_cuda INTERFACE
                   "-DHAS_TUNING"
                   )
