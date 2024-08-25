@@ -255,7 +255,7 @@ namespace mpi
 //! @brief A derived class of ChaseMpiDLAInterface which implements the
 //! inter-node computation for a multi-GPUs MPI-based implementation of ChASE.
 template <class T>
-class ChaseMpiDLAMultiGPUUM : public ChaseMpiDLAInterface<T>
+class ChaseMpiDLAMultiGPU : public ChaseMpiDLAInterface<T>
 {
 public:
     //! A constructor of ChaseMpiDLABlaslapack.
@@ -263,8 +263,8 @@ public:
     //! defines the MPI environment and data distribution scheme in ChASE-MPI.
     //! @param matrices: it is an instance of ChaseMpiMatrices, which
     //!  allocates the required buffers in ChASE-MPI.
-    ChaseMpiDLAMultiGPUUM(ChaseMpiProperties<T>* matrix_properties, T* H,
-                          std::size_t ldh, T* V1, Base<T>* ritzv)
+    ChaseMpiDLAMultiGPU(ChaseMpiProperties<T>* matrix_properties, T* H,
+                        std::size_t ldh, T* V1, Base<T>* ritzv)
 #if defined(HAS_UM)
         : matrices_(std::move(
               matrix_properties->create_matrices(3, H, ldh, V1, ritzv)))
@@ -406,7 +406,7 @@ public:
     }
 
     //! Destructor.
-    ~ChaseMpiDLAMultiGPUUM()
+    ~ChaseMpiDLAMultiGPU()
     {
         cudaStreamDestroy(stream1_);
         cudaStreamDestroy(stream2_);

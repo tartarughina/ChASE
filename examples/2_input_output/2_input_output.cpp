@@ -24,7 +24,13 @@
 #ifdef USE_MPI
 #include "ChASE-MPI/impl/chase_mpidla_blaslapack.hpp"
 #ifdef DRIVER_BUILD_MGPU
+#ifdef HAS_UM
+#include "ChASE-MPI/impl/chase_mpidla_mgpu_um.hpp"
+#else
 #include "ChASE-MPI/impl/chase_mpidla_mgpu.hpp"
+#endif
+#include <cuda.h>
+#include <cuda_runtime.h>
 #endif
 #endif
 
