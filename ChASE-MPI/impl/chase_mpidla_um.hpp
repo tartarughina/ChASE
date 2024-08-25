@@ -1418,11 +1418,9 @@ public:
         std::vector<T> alpha(numvec, T(1.0));
         std::vector<T> beta(numvec, T(0.0));
 
+        // As the mode is set to 3 unified memory will be used
         int matrix_mode = matrices_->get_Mode();
-        if (matrices_->get_Mode() == 2)
-        {
-            matrix_mode = 1;
-        }
+
         v_0 = new Matrix<T>(matrix_mode, m_, numvec);
         v_1 = new Matrix<T>(matrix_mode, m_, numvec);
         v_2 = new Matrix<T>(matrix_mode, m_, numvec);

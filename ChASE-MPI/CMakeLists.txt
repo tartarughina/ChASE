@@ -180,11 +180,13 @@ if(CMAKE_CUDA_COMPILER)
   # Enforce that ENABLE_TUNING requires ENABLE_UM
     if(ENABLE_TUNING AND NOT ENABLE_UM)
         message(FATAL_ERROR "ENABLE_TUNING requires ENABLE_UM to be ON. Please set -DENABLE_UM=ON.")
+    endif()
 
   if(ENABLE_UM)
     target_compile_definitions( chase_cuda INTERFACE
             "-DHAS_UM"
             )
+  endif()
   if(ENABLE_TUNING)
     target_compile_definitions( chase_cuda INTERFACE
             "-DHAS_TUNING"
