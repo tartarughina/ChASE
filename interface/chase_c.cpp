@@ -29,6 +29,7 @@
 using namespace chase;
 using namespace chase::mpi;
 
+// If HAS_GPU is defined, we use the ChaseMpiDLACudaSeq and ChaseMpiDLAMultiGPU
 #ifdef HAS_GPU
 template <typename T>
 using dlaSeq = ChaseMpiDLACudaSeq<T>;
@@ -45,7 +46,8 @@ class ChASE_SEQ
 {
 public:
     template <typename T>
-    static void Initialize(int N, int nev, int nex, T* H, int ldh, T* V, Base<T>* ritzv);
+    static void Initialize(int N, int nev, int nex, T* H, int ldh, T* V,
+                           Base<T>* ritzv);
 
     template <typename T>
     static void Finalize();
@@ -65,8 +67,8 @@ ChaseMpi<dlaSeq, std::complex<double>>* ChASE_SEQ::zchaseSeq = nullptr;
 ChaseMpi<dlaSeq, std::complex<float>>* ChASE_SEQ::cchaseSeq = nullptr;
 
 template <>
-void ChASE_SEQ::Initialize(int N, int nev, int nex, double* H, int ldh, double* V,
-                           double* ritzv)
+void ChASE_SEQ::Initialize(int N, int nev, int nex, double* H, int ldh,
+                           double* V, double* ritzv)
 {
     dchaseSeq = new ChaseMpi<dlaSeq, double>(N, nev, nex, H, ldh, V, ritzv);
 }
@@ -79,19 +81,19 @@ void ChASE_SEQ::Initialize(int N, int nev, int nex, float* H, int ldh, float* V,
 }
 
 template <>
-void ChASE_SEQ::Initialize(int N, int nev, int nex, std::complex<double>* H, int ldh,
-                           std::complex<double>* V, double* ritzv)
+void ChASE_SEQ::Initialize(int N, int nev, int nex, std::complex<double>* H,
+                           int ldh, std::complex<double>* V, double* ritzv)
 {
-    zchaseSeq =
-        new ChaseMpi<dlaSeq, std::complex<double>>(N, nev, nex, H, ldh, V, ritzv);
+    zchaseSeq = new ChaseMpi<dlaSeq, std::complex<double>>(N, nev, nex, H, ldh,
+                                                           V, ritzv);
 }
 
 template <>
-void ChASE_SEQ::Initialize(int N, int nev, int nex, std::complex<float>* H, int ldh,
-                           std::complex<float>* V, float* ritzv)
+void ChASE_SEQ::Initialize(int N, int nev, int nex, std::complex<float>* H,
+                           int ldh, std::complex<float>* V, float* ritzv)
 {
-    cchaseSeq =
-        new ChaseMpi<dlaSeq, std::complex<float>>(N, nev, nex, H, ldh, V, ritzv);
+    cchaseSeq = new ChaseMpi<dlaSeq, std::complex<float>>(N, nev, nex, H, ldh,
+                                                          V, ritzv);
 }
 
 template <>
@@ -157,7 +159,7 @@ int ChASE_SEQ_Finalize()
 }
 
 template <typename T>
-void ChASE_SEQ_Solve(int* deg, Base<T>* tol, char* mode, char* opt, char* qr )
+void ChASE_SEQ_Solve(int* deg, Base<T>* tol, char* mode, char* opt, char* qr)
 {
     ChaseMpi<dlaSeq, T>* single = ChASE_SEQ::getChase<T>();
 
@@ -439,7 +441,7 @@ int ChASE_DIST_Finalize()
 }
 
 template <typename T>
-void ChASE_DIST_Solve(int* deg, Base<T>* tol, char* mode, char* opt, char *qr)
+void ChASE_DIST_Solve(int* deg, Base<T>* tol, char* mode, char* opt, char* qr)
 {
     ChaseMpi<dlaDist, T>* single = ChASE_DIST::getChase<T>();
 
@@ -481,20 +483,19 @@ void ChASE_DIST_Solve(int* deg, Base<T>* tol, char* mode, char* opt, char *qr)
 #endif
 }
 
-template<typename T>
+template <typename T>
 void ChASE_DIST_WrtBlockCyclicHam(const std::string& filename, T* H)
 {
-    ChaseMpiProperties<T> *props = ChASE_DIST::getProperties<T>();
+    ChaseMpiProperties<T>* props = ChASE_DIST::getProperties<T>();
     props->writeHamiltonianBlockCyclicDist(filename, H);
 }
 
-template<typename T>
+template <typename T>
 void ChASE_DIST_ReadBlockCyclicHam(const std::string& filename, T* H)
 {
-    ChaseMpiProperties<T> *props = ChASE_DIST::getProperties<T>();
+    ChaseMpiProperties<T>* props = ChASE_DIST::getProperties<T>();
     props->readHamiltonianBlockCyclicDist(filename, H);
 }
-
 
 extern "C"
 {
@@ -518,8 +519,8 @@ extern "C"
     //! @param[in,out] ritzv an array of size `nev` which contains the desired
     //! eigenvalues
     //! @param[in,out] init a flag to indicate if ChASE has been initialized
-    void dchase_init_(int* N, int* nev, int* nex, double* H, int *ldh, double* V,
-                      double* ritzv, int* init)
+    void dchase_init_(int* N, int* nev, int* nex, double* H, int* ldh,
+                      double* V, double* ritzv, int* init)
     {
         *init = ChASE_SEQ_Init<double>(*N, *nev, *nex, H, *ldh, V, ritzv);
     }
@@ -537,7 +538,7 @@ extern "C"
     //! @param[in,out] ritzv an array of size `nev` which contains the desired
     //! eigenvalues
     //! @param[in,out] init a flag to indicate if ChASE has been initialized
-    void schase_init_(int* N, int* nev, int* nex, float* H,  int *ldh, float* V,
+    void schase_init_(int* N, int* nev, int* nex, float* H, int* ldh, float* V,
                       float* ritzv, int* init)
     {
         *init = ChASE_SEQ_Init<float>(*N, *nev, *nex, H, *ldh, V, ritzv);
@@ -549,14 +550,14 @@ extern "C"
     //! @param[in] nev number of desired eigenpairs
     //! @param[in] nex extra searching space size
     //! @param[in] h pointer to the matrix to be diagonalized
-    //! @param[in] ldh a leading dimension of h    
+    //! @param[in] ldh a leading dimension of h
     //! @param[in,out] v `(nx(nev+nex))` matrix, input is the initial guess
     //! eigenvectors, and for output, the first `nev` columns are overwritten by
     //! the desired eigenvectors
     //! @param[in,out] ritzv an array of size `nev` which contains the desired
     //! eigenvalues
     //! @param[in,out] init a flag to indicate if ChASE has been initialized
-    void cchase_init_(int* N, int* nev, int* nex, float _Complex* H, int *ldh,
+    void cchase_init_(int* N, int* nev, int* nex, float _Complex* H, int* ldh,
                       float _Complex* V, float* ritzv, int* init)
     {
         *init = ChASE_SEQ_Init<std::complex<float>>(
@@ -570,14 +571,14 @@ extern "C"
     //! @param[in] nev number of desired eigenpairs
     //! @param[in] nex extra searching space size
     //! @param[in] h pointer to the matrix to be diagonalized
-    //! @param[in] ldh a leading dimension of h    
+    //! @param[in] ldh a leading dimension of h
     //! @param[in,out] v `(nx(nev+nex))` matrix, input is the initial guess
     //! eigenvectors, and for output, the first `nev` columns are overwritten by
     //! the desired eigenvectors
     //! @param[in,out] ritzv an array of size `nev` which contains the desired
     //! eigenvalues
     //! @param[in,out] init a flag to indicate if ChASE has been initialized
-    void zchase_init_(int* N, int* nev, int* nex, double _Complex* H, int *ldh,
+    void zchase_init_(int* N, int* nev, int* nex, double _Complex* H, int* ldh,
                       double _Complex* V, double* ritzv, int* init)
     {
         *init = ChASE_SEQ_Init<std::complex<double>>(
@@ -618,9 +619,9 @@ extern "C"
     //! not.
     //! @param[in] opt determining if using internal optimization of Chebyshev
     //! polynomial degree. If `opt=S`, use, otherwise, no.
-    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use, 
-    //! otherwise, no use.     
-    void dchase_(int* deg, double* tol, char* mode, char* opt, char *qr)
+    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use,
+    //! otherwise, no use.
+    void dchase_(int* deg, double* tol, char* mode, char* opt, char* qr)
     {
         ChASE_SEQ_Solve<double>(deg, tol, mode, opt, qr);
     }
@@ -636,9 +637,9 @@ extern "C"
     //! not.
     //! @param[in] opt determining if using internal optimization of Chebyshev
     //! polynomial degree. If `opt=S`, use, otherwise, no.
-    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use, 
-    //! otherwise, no use.     
-    void schase_(int* deg, float* tol, char* mode, char* opt, char *qr)
+    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use,
+    //! otherwise, no use.
+    void schase_(int* deg, float* tol, char* mode, char* opt, char* qr)
     {
         ChASE_SEQ_Solve<float>(deg, tol, mode, opt, qr);
     }
@@ -654,9 +655,9 @@ extern "C"
     //! not.
     //! @param[in] opt determining if using internal optimization of Chebyshev
     //! polynomial degree. If `opt=S`, use, otherwise, no.
-    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use, 
-    //! otherwise, no use.     
-    void zchase_(int* deg, double* tol, char* mode, char* opt, char *qr)
+    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use,
+    //! otherwise, no use.
+    void zchase_(int* deg, double* tol, char* mode, char* opt, char* qr)
     {
         ChASE_SEQ_Solve<std::complex<double>>(deg, tol, mode, opt, qr);
     }
@@ -672,9 +673,9 @@ extern "C"
     //! not.
     //! @param[in] opt determining if using internal optimization of Chebyshev
     //! polynomial degree. If `opt=S`, use, otherwise, no.
-    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use, 
-    //! otherwise, no use.     
-    void cchase_(int* deg, float* tol, char* mode, char* opt, char *qr)
+    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use,
+    //! otherwise, no use.
+    void cchase_(int* deg, float* tol, char* mode, char* opt, char* qr)
     {
         ChASE_SEQ_Solve<std::complex<float>>(deg, tol, mode, opt, qr);
     }
@@ -1377,9 +1378,9 @@ extern "C"
     //! not.
     //! @param[in] opt determining if using internal optimization of Chebyshev
     //! polynomial degree. If `opt=S`, use, otherwise, no.
-    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use, 
-    //! otherwise, no use.     
-    void pdchase_(int* deg, double* tol, char* mode, char* opt, char *qr)
+    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use,
+    //! otherwise, no use.
+    void pdchase_(int* deg, double* tol, char* mode, char* opt, char* qr)
     {
         ChASE_DIST_Solve<double>(deg, tol, mode, opt, qr);
     }
@@ -1395,9 +1396,9 @@ extern "C"
     //! not.
     //! @param[in] opt determining if using internal optimization of Chebyshev
     //! polynomial degree. If `opt=S`, use, otherwise, no.
-    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use, 
-    //! otherwise, no use.     
-    void pschase_(int* deg, float* tol, char* mode, char* opt, char *qr)
+    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use,
+    //! otherwise, no use.
+    void pschase_(int* deg, float* tol, char* mode, char* opt, char* qr)
     {
         ChASE_DIST_Solve<float>(deg, tol, mode, opt, qr);
     }
@@ -1413,9 +1414,9 @@ extern "C"
     //! not.
     //! @param[in] opt determining if using internal optimization of Chebyshev
     //! polynomial degree. If `opt=S`, use, otherwise, no.
-    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use, 
-    //! otherwise, no use.     
-    void pzchase_(int* deg, double* tol, char* mode, char* opt, char *qr)
+    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use,
+    //! otherwise, no use.
+    void pzchase_(int* deg, double* tol, char* mode, char* opt, char* qr)
     {
         ChASE_DIST_Solve<std::complex<double>>(deg, tol, mode, opt, qr);
     }
@@ -1431,54 +1432,60 @@ extern "C"
     //! not.
     //! @param[in] opt determining if using internal optimization of Chebyshev
     //! polynomial degree. If `opt=S`, use, otherwise, no.
-    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use, 
-    //! otherwise, no use.     
-    void pcchase_(int* deg, float* tol, char* mode, char* opt, char *qr)
+    //! @param[in] qr determining if flexible CholeskyQR, if `qr=C` use,
+    //! otherwise, no use.
+    void pcchase_(int* deg, float* tol, char* mode, char* opt, char* qr)
     {
         ChASE_DIST_Solve<std::complex<float>>(deg, tol, mode, opt, qr);
     }
-    //! Write the block-cyclic distributed Hamiltonian matrix into an output file
+    //! Write the block-cyclic distributed Hamiltonian matrix into an output
+    //! file
     //!
     //! @param[in] filename the name of output filename
-    //! @param[in] H the pointer to the Hamitoninan matrix to be saved  
+    //! @param[in] H the pointer to the Hamitoninan matrix to be saved
     void pschase_wrtHam_blockcyclic_(const char* filename, float* H)
     {
         std::string filename_str(filename);
         ChASE_DIST_WrtBlockCyclicHam<float>(filename_str, H);
     }
-    //! Write the block-cyclic distributed Hamiltonian matrix into an output file
+    //! Write the block-cyclic distributed Hamiltonian matrix into an output
+    //! file
     //!
     //! @param[in] filename the name of output filename
-    //! @param[in] H the pointer to the Hamitoninan matrix to be saved  
+    //! @param[in] H the pointer to the Hamitoninan matrix to be saved
     void pdchase_wrtHam_blockcyclic_(const char* filename, double* H)
     {
         std::string filename_str(filename);
         ChASE_DIST_WrtBlockCyclicHam<double>(filename_str, H);
     }
 
-    //! Write the block-cyclic distributed Hamiltonian matrix into an output file
+    //! Write the block-cyclic distributed Hamiltonian matrix into an output
+    //! file
     //!
     //! @param[in] filename the name of output filename
-    //! @param[in] H the pointer to the Hamitoninan matrix to be saved  
+    //! @param[in] H the pointer to the Hamitoninan matrix to be saved
     void pcchase_wrtHam_blockcyclic_(const char* filename, float _Complex* H)
     {
         std::string filename_str(filename);
-        ChASE_DIST_WrtBlockCyclicHam<std::complex<float>>(filename_str, reinterpret_cast<std::complex<float>*>(H));
+        ChASE_DIST_WrtBlockCyclicHam<std::complex<float>>(
+            filename_str, reinterpret_cast<std::complex<float>*>(H));
     }
 
-    //! Write the block-cyclic distributed Hamiltonian matrix into an output file
+    //! Write the block-cyclic distributed Hamiltonian matrix into an output
+    //! file
     //!
     //! @param[in] filename the name of output filename
-    //! @param[in] H the pointer to the Hamitoninan matrix to be saved  
+    //! @param[in] H the pointer to the Hamitoninan matrix to be saved
     void pzchase_wrtHam_blockcyclic_(const char* filename, double _Complex* H)
     {
         std::string filename_str(filename);
-        ChASE_DIST_WrtBlockCyclicHam<std::complex<double>>(filename_str, reinterpret_cast<std::complex<double>*>(H));
+        ChASE_DIST_WrtBlockCyclicHam<std::complex<double>>(
+            filename_str, reinterpret_cast<std::complex<double>*>(H));
     }
     //! Read the block-cyclic distributed Hamiltonian matrix from an input file
     //!
     //! @param[in] filename the name of input filename
-    //! @param[in] H the pointer to the Hamitoninan matrix to be saved  
+    //! @param[in] H the pointer to the Hamitoninan matrix to be saved
     void pschase_readHam_blockcyclic_(const char* filename, float* H)
     {
         std::string filename_str(filename);
@@ -1487,7 +1494,7 @@ extern "C"
     //! Read the block-cyclic distributed Hamiltonian matrix from an input file
     //!
     //! @param[in] filename the name of input filename
-    //! @param[in] H the pointer to the Hamitoninan matrix to be saved  
+    //! @param[in] H the pointer to the Hamitoninan matrix to be saved
     void pdchase_readHam_blockcyclic_(const char* filename, double* H)
     {
         std::string filename_str(filename);
@@ -1497,21 +1504,23 @@ extern "C"
     //! Read the block-cyclic distributed Hamiltonian matrix from an input file
     //!
     //! @param[in] filename the name of input filename
-    //! @param[in] H the pointer to the Hamitoninan matrix to be saved  
+    //! @param[in] H the pointer to the Hamitoninan matrix to be saved
     void pcchase_readHam_blockcyclic_(const char* filename, float _Complex* H)
     {
         std::string filename_str(filename);
-        ChASE_DIST_ReadBlockCyclicHam<std::complex<float>>(filename_str, reinterpret_cast<std::complex<float>*>(H));
+        ChASE_DIST_ReadBlockCyclicHam<std::complex<float>>(
+            filename_str, reinterpret_cast<std::complex<float>*>(H));
     }
 
     //! Read the block-cyclic distributed Hamiltonian matrix from an input file
     //!
     //! @param[in] filename the name of input filename
-    //! @param[in] H the pointer to the Hamitoninan matrix to be saved  
+    //! @param[in] H the pointer to the Hamitoninan matrix to be saved
     void pzchase_readHam_blockcyclic_(const char* filename, double _Complex* H)
     {
         std::string filename_str(filename);
-        ChASE_DIST_ReadBlockCyclicHam<std::complex<double>>(filename_str, reinterpret_cast<std::complex<double>*>(H));
+        ChASE_DIST_ReadBlockCyclicHam<std::complex<double>>(
+            filename_str, reinterpret_cast<std::complex<double>*>(H));
     }
 
     /** @} */ // end of chase-c

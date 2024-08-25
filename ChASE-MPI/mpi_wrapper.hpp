@@ -146,8 +146,9 @@ void Bcast(int backend, T* buff, int count, MPI_Datatype datatype, int root,
 // the only thing is that DeviceToDevice is a bit complicated
 // I mean, it actually do something copying memory from a device to another...
 // Changing that with a standard memcpy is possible but dumb...
-// Dunno for the emoment i could simply do nothing a leave it
-void Memcpy(int mode, void* dst, const void* src, std::size_t count)
+// Dunno for the moment i could simply do nothing and leave it
+void Memcpy(int mode, void* dst, const void* src, std::size_t count,
+            int device_id = 0)
 {
     switch (mode)
     {
@@ -155,6 +156,24 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count)
             std::memcpy(dst, src, count);
             break;
 #if defined(CUDA_AWARE)
+#if defined(HAS_UM)
+#if defined(HAS_TUNING)
+        case CPY_D2D:
+            cudaMemPrefecthAsync(src, count, device_id);
+            break;
+        case CPY_D2H:
+            cudaMemPrefecthAsync(src, count, cpuDeviceId);
+            break;
+        case CPY_H2D:
+            cudaMemPrefecthAsync(src, count, device_id);
+            break;
+#else
+        case CPY_D2D:
+        case CPY_D2H:
+        case CPY_H2D:
+            break;
+#endif
+#else
         case CPY_D2D:
             cudaMemcpy(dst, src, count, cudaMemcpyDeviceToDevice);
             // cudaDeviceSynchronize();
@@ -165,6 +184,7 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count)
         case CPY_H2D:
             cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice);
             break;
+#endif
 #endif
     }
 }

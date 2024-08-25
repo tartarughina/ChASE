@@ -17,6 +17,8 @@
 #include "ChASE-MPI/impl/chase_mpidla_blaslapack.hpp"
 #ifdef DRIVER_BUILD_MGPU
 #include "ChASE-MPI/impl/chase_mpidla_mgpu.hpp"
+#include <cuda.h>
+#include <cuda_runtime.h>
 #endif
 
 using T = std::complex<double>;
@@ -73,11 +75,26 @@ int main(int argc, char** argv)
 
     auto m_ = props->get_m();
     auto n_ = props->get_n();
+    auto ldh_ = props->get_ldh();
+
+#ifdef HAS_UM
+    T *V_m, *H_m;
+    Base<T>* Lambda_m;
+    cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
+
+    auto V = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
+    auto Lambda =
+        std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
+    auto H = std::vector<T>(H_m, H_m + ldh_ * n_);
+#else
     auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
-    auto ldh_ = props->get_ldh();
-    auto H = std::vector<T>(ldh_ * n_);     // eigevectors
+    auto H = std::vector<T>(ldh_ * n_);            // eigevectors
+#endif
 
+    // Creation of ChaseMPIDLA and ChaseMPIDLA_MGPU objects
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
 
     /*Setup configure for ChASE*/
@@ -92,7 +109,7 @@ int main(int argc, char** argv)
     config.SetApprox(false);
     /*Enable checking the symmetricity of matrices*/
     config.EnableSymCheck(true);
-    
+
     if (rank == 0)
         std::cout << "Solving " << idx_max << " symmetrized Clement matrices ("
                   << N << "x" << N
@@ -113,7 +130,7 @@ int main(int argc, char** argv)
             Clement[i + 1 + N * i] = std::sqrt(i * (N + 1 - i));
         if (i != N - 1)
             Clement[i + N * (i + 1)] = std::sqrt(i * (N + 1 - i));
-    }   
+    }
 
 #ifdef USE_BLOCK_CYCLIC
     /*local block number = mblocks x nblocks*/
@@ -154,8 +171,7 @@ int main(int argc, char** argv)
                 {
                     for (std::size_t p = 0; p < r_lens[i]; p++)
                     {
-                        H[(q + c_offs_l[j]) * m + p +
-                                              r_offs_l[i]] =
+                        H[(q + c_offs_l[j]) * m + p + r_offs_l[i]] =
                             Clement[(q + c_offs[j]) * N + p + r_offs[i]];
                     }
                 }
@@ -168,13 +184,12 @@ int main(int argc, char** argv)
         {
             for (std::size_t y = 0; y < ylen; y++)
             {
-                H[x + xlen * y] =
-                    Clement.at((xoff + x) + (yoff + y) * N);
+                H[x + xlen * y] = Clement.at((xoff + x) + (yoff + y) * N);
             }
         }
 #endif
 
-        if(!single.checkSymmetryEasy())
+        if (!single.checkSymmetryEasy())
         {
             single.symOrHermMatrix('L');
         }
@@ -224,4 +239,11 @@ int main(int argc, char** argv)
     }
 
     MPI_Finalize();
+
+#ifdef UM
+    /*Free the memory of the matrix*/
+    cudaFree(V_m);
+    cudaFree(H_m);
+    cudaFree(Lambda_m);
+#endif
 }

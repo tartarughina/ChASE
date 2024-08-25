@@ -64,7 +64,7 @@ public:
             else
             {
                 // Due to this element I don't think the option to pass a
-                // Unified Memory pointer is the reight one as the class will
+                // Unified Memory pointer is the right one as the class will
                 // try to free memory using the wrong method
                 cudaFreeHost(ptr_);
             }
@@ -130,6 +130,51 @@ private:
     bool allocated_;
     std::string type_;
 };
+#if defined(HAS_UM)
+template <class T>
+class UnifiedMem
+{
+public:
+    UnifiedMem() : size_(0), ptr_(nullptr), allocated_(false) {}
+
+    UnifiedMem(std::size_t size) : size_(size), allocated_(true), type_("GPU")
+    {
+        int dev;
+        cudaGetDevice(&dev);
+        device_ = dev;
+        cudaMallocManaged(&ptr_, size_ * sizeof(T));
+        cudaMemset(ptr_, 0, size_ * sizeof(T));
+    }
+
+    GpuMem(T* ptr, std::size_t size)
+        : size_(size), ptr_(ptr), allocated_(false), type_("GPU")
+    {
+    }
+
+    ~UnifiedMem()
+    {
+        if (allocated_)
+        {
+            cudaFree(ptr_);
+        }
+    }
+
+    int dev_id() { return device_; }
+
+    T* ptr() { return ptr_; }
+
+    bool isAlloc() { return allocated_; }
+
+    std::string type() { return type_; }
+
+private:
+    int device_;
+    std::size_t size_;
+    T* ptr_;
+    bool allocated_;
+    std::string type_;
+};
+#endif
 #endif
 
 template <class T>
@@ -162,6 +207,13 @@ public:
                 isHostAlloc_ = false;
                 isDeviceAlloc_ = true;
                 break;
+#if defined(HAS_UM)
+            case 3: // Unified Memory
+                Device_ = std::make_shared<UnifiedMem<T>>(m * n);
+                isHostAlloc_ = false;
+                isDeviceAlloc_ = true;
+                break;
+#endif
 #endif
         }
     }
@@ -189,6 +241,14 @@ public:
                 isHostAlloc_ = true;
                 isDeviceAlloc_ = true;
                 break;
+#if defined(HAS_UM)
+            case 3:
+                Host_ = std::make_shared<UnifiedMem<T>>(ptr, ld * n);
+                Device_ = Host_;
+                isHostAlloc_ = true;
+                isDeviceAlloc_ = true;
+                break;
+#endif
 #endif
         }
     }
@@ -215,7 +275,7 @@ public:
     void swap(Matrix<T>& swapping_obj)
     {
         std::swap(Host_, swapping_obj.Host_);
-#if defined(HAS_CUDA)
+#if defined(HAS_CUDA) && !defined(HAS_UM)
         std::swap(Device_, swapping_obj.Device_);
 #endif
     }
@@ -229,49 +289,103 @@ public:
 #if defined(HAS_CUDA)
     std::size_t d_ld() { return m_; }
 #endif
-
+// cublasSet and cublasGet are just wrappers to memcpy therefore for UM all i
+// need is to prefetch stuff from/to the device when tuning is enabled or ignore
+// when not enabled
 #if defined(HAS_CUDA)
     void H2D()
     {
+#if defined(HAS_UM) && defined(HAS_TUNING)
+        cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
+                             Device_.dev_id(), 0);
+#elif defined(HAS_UM) && !defined(HAS_TUNING)
+        // Do nothing
+#else
         cublasSetMatrix(m_, n_, sizeof(T), this->host(), this->h_ld(),
                         this->device(), this->d_ld());
+#endif
     }
 
     void H2D(std::size_t nrows, std::size_t ncols, std::size_t offset = 0)
     {
+#if defined(HAS_UM) && defined(HAS_TUNING)
+        // Prefetch the specific part of the matrix to the GPU
+        cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
+                             nrows * ncols * sizeof(T), Device_.dev_id(), 0);
+#elif defined(HAS_UM) && !defined(HAS_TUNING)
+        // Do nothing since UM is enabled but no tuning is required
+#else
+        // Standard host-to-device memory transfer using cuBLAS
         cublasSetMatrix(nrows, ncols, sizeof(T),
                         this->host() + offset * this->h_ld(), this->h_ld(),
                         this->device() + offset * this->d_ld(), this->d_ld());
+#endif
     }
 
     void D2H()
     {
+#if defined(HAS_UM) && defined(HAS_TUNING)
+        // Prefetch the specific part of the matrix to the GPU
+        cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
+                             cudaCpuDeviceId, 0);
+#elif defined(HAS_UM) && !defined(HAS_TUNING)
+        // Do nothing since UM is enabled but no tuning is required
+#else
+        // Standard device-to-host memory transfer using cuBLAS
         cublasGetMatrix(m_, n_, sizeof(T), this->device(), this->d_ld(),
                         this->host(), this->h_ld());
+#endif
     }
 
     void D2H(std::size_t nrows, std::size_t ncols, std::size_t offset = 0)
     {
+#if defined(HAS_UM) && defined(HAS_TUNING)
+        // Prefetch the specific part of the matrix to the GPU
+        cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
+                             nrows * ncols * sizeof(T), cudaCpuDeviceId, 0);
+#elif defined(HAS_UM) && !defined(HAS_TUNING)
+        // Do nothing since UM is enabled but no tuning is required
+#else
+        // Standard device-to-host memory transfer using cuBLAS
         cublasGetMatrix(nrows, ncols, sizeof(T),
                         this->device() + offset * this->d_ld(), this->d_ld(),
                         this->host() + offset * this->h_ld(), this->h_ld());
+#endif
     }
 #endif
 
     void sync2Ptr(std::size_t nrows, std::size_t ncols, std::size_t offset = 0)
     {
 #if defined(HAS_CUDA)
+#if defined(HAS_UM) && defined(HAS_TUNING)
+        // Prefetch the specific part of the matrix to the GPU
+        cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
+                             nrows * ncols * sizeof(T), cudaCpuDeviceId, 0);
+#elif defined(HAS_UM) && !defined(HAS_TUNING)
+        // Do nothing since UM is enabled but no tuning is required
+#else
+        // Standard device-to-host memory transfer using cuBLAS
         cublasGetMatrix(nrows, ncols, sizeof(T),
                         this->device() + offset * this->d_ld(), this->d_ld(),
                         this->host() + offset * this->h_ld(), this->h_ld());
+#endif
 #endif
     }
 
     void sync2Ptr()
     {
 #if defined(HAS_CUDA)
-        cublasGetMatrix(this->m_, this->n_, sizeof(T), this->device(),
-                        this->d_ld(), this->host(), this->h_ld());
+#if defined(HAS_UM) && defined(HAS_TUNING)
+        // Prefetch the specific part of the matrix to the GPU
+        cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
+                             cudaCpuDeviceId, 0);
+#elif defined(HAS_UM) && !defined(HAS_TUNING)
+        // Do nothing since UM is enabled but no tuning is required
+#else
+        // Standard device-to-host memory transfer using cuBLAS
+        cublasGetMatrix(m_, n_, sizeof(T), this->device(), this->d_ld(),
+                        this->host(), this->h_ld());
+#endif
 #endif
     }
 
@@ -279,17 +393,33 @@ public:
                      std::size_t offset = 0)
     {
 #if defined(HAS_CUDA)
+#if defined(HAS_UM) && defined(HAS_TUNING)
+        // Prefetch the specific part of the matrix to the GPU
+        cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
+                             nrows * ncols * sizeof(T), Device_.dev_id(), 0);
+#elif defined(HAS_UM) && !defined(HAS_TUNING)
+        // Do nothing since UM is enabled but no tuning is required
+#else
+        // Standard host-to-device memory transfer using cuBLAS
         cublasSetMatrix(nrows, ncols, sizeof(T),
                         this->host() + offset * this->h_ld(), this->h_ld(),
                         this->device() + offset * this->d_ld(), this->d_ld());
+#endif
 #endif
     }
 
     void syncFromPtr()
     {
 #if defined(HAS_CUDA)
-        cublasSetMatrix(this->m_, this->n_, sizeof(T), this->host(),
-                        this->h_ld(), this->device(), this->d_ld());
+#if defined(HAS_UM) && defined(HAS_TUNING)
+        cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
+                             Device_.dev_id(), 0);
+#elif defined(HAS_UM) && !defined(HAS_TUNING)
+        // Do nothing
+#else
+        cublasSetMatrix(m_, n_, sizeof(T), this->host(), this->h_ld(),
+                        this->device(), this->d_ld());
+#endif
 #endif
     }
 
@@ -364,6 +494,15 @@ public:
             onlyGPU = 2;
         }
 
+#if defined(HAS_UM)
+        // mode 3 is for Unified Memory
+        if (mode == 3)
+        {
+            isGPU = 3;
+            onlyGPU = 3;
+        }
+#endif
+
         H___ = std::make_unique<Matrix<T>>(isGPU, N, N, H, ldh);
         C___ = std::make_unique<Matrix<T>>(isGPU, N, max_block, V1, N);
         B___ = std::make_unique<Matrix<T>>(onlyGPU, N, max_block);
@@ -426,6 +565,16 @@ public:
             isGPU = 1;
             isCUDA_Aware = 2;
         }
+
+#if defined(HAS_UM)
+        // mode 3 is for Unified Memory
+        if (mode == 3)
+        {
+            isGPU = 3;
+            isCUDA_Aware = 3;
+        }
+#endif
+
         H___ = std::make_unique<Matrix<T>>(isGPU, m, n, H, ldh);
         C___ = std::make_unique<Matrix<T>>(isCUDA_Aware, m, max_block, V1, m);
         C2___ = std::make_unique<Matrix<T>>(isCUDA_Aware, m, max_block);
@@ -469,6 +618,11 @@ public:
             case 2:
                 C = this->C().device();
                 break;
+#if defined(HAS_UM)
+            case 3:
+                C = this->C().device();
+                break;
+#endif
 #endif
         }
         return C;
@@ -489,6 +643,11 @@ public:
             case 2:
                 C2 = this->C2().device();
                 break;
+#if defined(HAS_UM)
+            case 3:
+                C2 = this->C2().device();
+                break;
+#endif
 #endif
         }
         return C2;
@@ -509,6 +668,11 @@ public:
             case 2:
                 B = this->B().device();
                 break;
+#if defined(HAS_UM)
+            case 3:
+                B = this->B().device();
+                break;
+#endif
 #endif
         }
         return B;
@@ -529,6 +693,11 @@ public:
             case 2:
                 B2 = this->B2().device();
                 break;
+#if defined(HAS_UM)
+            case 3:
+                B2 = this->B2().device();
+                break;
+#endif
 #endif
         }
         return B2;
@@ -549,6 +718,11 @@ public:
             case 2:
                 a = this->A().device();
                 break;
+#if defined(HAS_UM)
+            case 3:
+                a = this->A().device();
+                break;
+#endif
 #endif
         }
         return a;
@@ -569,6 +743,11 @@ public:
             case 2:
                 rsd = this->Resid().device();
                 break;
+#if defined(HAS_UM)
+            case 3:
+                rsd = this->Resid().device();
+                break;
+#endif
 #endif
         }
         return rsd;
@@ -589,6 +768,11 @@ public:
             case 2:
                 v = this->vv().device();
                 break;
+#if defined(HAS_UM)
+            case 3:
+                v = this->vv().device();
+                break;
+#endif
 #endif
         }
         return v;

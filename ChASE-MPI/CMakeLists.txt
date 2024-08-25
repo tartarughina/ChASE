@@ -6,6 +6,8 @@ cmake_minimum_required( VERSION 3.8 )
 option(ENABLE_CUDA_AWARE_MPI "Enable CUDA aware MPI for collective communications" ON)
 option(ENABLE_NCCL "Enable Nvidia NCCL for collective communications" ON)
 option(ENABLE_MPI_IO "Enable MPI IO to read Hamiltonian matrix from local" ON)
+option(ENABLE_UM "Enable Unified Memory for CUDA" OFF)
+option(ENABLE_TUNING "Enable UM Tuning, requires ENABLE_UM" OFF)
 
 add_library( chase_seq INTERFACE )
 target_link_libraries(chase_seq INTERFACE chase_algorithm)
@@ -49,7 +51,7 @@ target_include_directories( chase_seq INTERFACE
 target_link_libraries( chase_seq INTERFACE
   ${BLAS_LIBRARIES}
   ${LAPACK_LIBRARIES}
-  ${MPI_CXX_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES}
   )
 
 if(SCALAPACK_FOUND)
@@ -59,7 +61,7 @@ if(SCALAPACK_FOUND)
 endif()
 
 target_compile_options( chase_seq INTERFACE
-  ${MPI_CXX_COMPILE_FLAGS}  
+  ${MPI_CXX_COMPILE_FLAGS}
   )
 
 target_include_directories( chase_mpi INTERFACE
@@ -79,8 +81,8 @@ if(SCALAPACK_FOUND)
   target_link_libraries( chase_mpi INTERFACE
         ${SCALAPACK_LIBRARIES}
         )
-  target_compile_definitions( chase_mpi INTERFACE 
-	  "-DHAS_SCALAPACK" 
+  target_compile_definitions( chase_mpi INTERFACE
+	  "-DHAS_SCALAPACK"
 	)
 endif()
 
@@ -101,10 +103,13 @@ if(CMAKE_CUDA_COMPILER)
   if (${CMAKE_VERSION} VERSION_LESS_EQUAL "3.18.0")
     find_package(CUDA REQUIRED)
   elseif(${CMAKE_VERSION} VERSION_GREATER "3.18.0")
-    find_package(CUDAToolkit REQUIRED)	  
-    set(CUDA_CUBLAS_LIBRARIES CUDA::cublas)
-    set(CUDA_cusolver_LIBRARY CUDA::cusolver)
-    set(CUDA_curand_LIBRARY CUDA::curand)    
+    find_package(CUDAToolkit REQUIRED)
+    # the libraries below have issues compiling with NVHPC
+    # and the CMake version avaialble on Polaris
+    # as a turnaround set them manually
+    # set(CUDA_CUBLAS_LIBRARIES CUDA::cublas)
+    # set(CUDA_cusolver_LIBRARY CUDA::cusolver)
+    # set(CUDA_curand_LIBRARY CUDA::curand)
   endif()
 
   enable_language(CUDA)
@@ -115,14 +120,14 @@ if(CMAKE_CUDA_COMPILER)
   endif()
 
   # If cuda compute compatibility of your GPU is 8.6 (e.g. RTX 3090) you should build with
-  # -DCMAKE_CUDA_ARCHITECTURES=86. In the case you want to build code for more than one 
+  # -DCMAKE_CUDA_ARCHITECTURES=86. In the case you want to build code for more than one
   # CUDA compute capability (e.g. 70, 75, 80 and 86) then build with
   # -DCMAKE_CUDA_ARCHITECTURES="70;75;80;86"
 
-  # If CMAKE_VERSION < 3.18 then CMake is not compliant with CMAKE policy CMP0104 (introduced 
+  # If CMAKE_VERSION < 3.18 then CMake is not compliant with CMAKE policy CMP0104 (introduced
   # in CMake 3.18) which defines that the variable CMAKE_CUDA_ARCHITECTURES has to be initialized.
   # In that case, the code generation flag has to be set manually.
-  # For simplicity and compatibility with newer (3.18+) CMake version, the CMAKE_CUDA_ARCHITECTURES 
+  # For simplicity and compatibility with newer (3.18+) CMake version, the CMAKE_CUDA_ARCHITECTURES
   # variable has to be always set, not matter the cmake version.
   if (${CMAKE_VERSION} VERSION_LESS "3.18.0")
     message("CMAKE version less than 3.18. Using old CMAKE CUDA policy for defining CUDA code generation flags")
@@ -139,14 +144,14 @@ if(CMAKE_CUDA_COMPILER)
       message(STATUS "No Nsight Profiling Tools detected")
       set(ENABLE_NSIGHT OFF CACHE BOOL "" FORCE)
     endif()
-  endif()	  
+  endif()
   add_library( chase_cuda "kernels/shift.cu" )
 
-  set_target_properties( chase_cuda 
+  set_target_properties( chase_cuda
 	  		 PROPERTIES
 		  		CUDA_RESOLVE_DEVICE_SYMBOLS ON
 				CUDA_SEPARABLE_COMPILATION ON)
- 
+
   target_include_directories(
       chase_cuda
       PUBLIC #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
@@ -163,7 +168,7 @@ if(CMAKE_CUDA_COMPILER)
     )
   target_link_libraries( chase_mpi INTERFACE
     ${CUDA_nvToolsExt_LIBRARY}
-    )    
+    )
   target_link_libraries( chase_seq INTERFACE
     ${CUDA_nvToolsExt_LIBRARY}
     )
@@ -171,6 +176,21 @@ if(CMAKE_CUDA_COMPILER)
   target_compile_definitions( chase_cuda INTERFACE
 	  "-DHAS_CUDA"
         )
+
+  # Enforce that ENABLE_TUNING requires ENABLE_UM
+    if(ENABLE_TUNING AND NOT ENABLE_UM)
+        message(FATAL_ERROR "ENABLE_TUNING requires ENABLE_UM to be ON. Please set -DENABLE_UM=ON.")
+
+  if(ENABLE_UM)
+    target_compile_definitions( chase_cuda INTERFACE
+            "-DHAS_UM"
+            )
+  if(ENABLE_TUNING)
+    target_compile_definitions( chase_cuda INTERFACE
+            "-DHAS_TUNING"
+            )
+  endif()
+  endif()
 
 if(ENABLE_CUDA_AWARE_MPI)
   target_compile_definitions( chase_cuda INTERFACE
@@ -199,7 +219,7 @@ endif()
       target_compile_definitions(chase_seq  INTERFACE USE_NSIGHT)
       target_compile_definitions(chase_mpi INTERFACE USE_NSIGHT)
       target_compile_definitions(chase_algorithm INTERFACE USE_NSIGHT)
-  endif()	  
+  endif()
 
   install( TARGETS chase_cuda
     EXPORT chase-cuda
@@ -259,4 +279,3 @@ install(EXPORT chase-mpi
   EXPORT_LINK_INTERFACE_LIBRARIES
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
   )
-
