@@ -187,26 +187,22 @@ int do_chase(ChASE_DriverProblemConfig& conf)
     auto ldh_ = N;
 #endif
 
-#ifdef HAS_UM
-    T *V_m, *H_m;
-    Base<T>* Lambda_m;
-    cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
-    cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
-    cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
+    T *V, *H;
+    Base<T>* Lambda;
 
-    auto V__ = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
-    auto Lambda__ =
-        std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
-    auto H__ = std::vector<T>(H_m, H_m + ldh_ * n_);
+#ifdef HAS_UM
+    cudaMallocManaged((void**)&V, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H, ldh_ * n_ * sizeof(T));
 #else
     auto V__ = std::unique_ptr<T[]>(new T[m_ * (nev + nex)]);
     auto Lambda__ = std::unique_ptr<Base<T>[]>(new Base<T>[(nev + nex)]);
-    auto H__ = std::unique_ptr<T[]>(new T[ldh_ * n_]); // eigevectors
-#endif
+    auto H__ = std::unique_ptr<T[]>(new T[ldh_ * n_]);
 
-    T* V = V__.get();
-    Base<T>* Lambda = Lambda__.get();
-    T* H = H__.get();
+    V = V__.get();
+    Lambda = Lambda__.get();
+    H = H__.get();
+#endif
 
 #if defined(USE_MPI)
 #ifdef USE_BLOCK_CYCLIC
@@ -630,6 +626,13 @@ int main(int argc, char* argv[])
 #ifdef USE_MPI
     MPI_Finalize();
 #else
+
+#ifdef HAS_UM
+    /*Free the memory of the matrix*/
+    cudaFree(V_m);
+    cudaFree(H_m);
+    cudaFree(Lambda_m);
+#endif
     return 0;
 #endif
 }

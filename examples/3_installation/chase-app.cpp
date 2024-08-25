@@ -51,9 +51,22 @@ int main(int argc, char** argv)
     auto n_ = props->get_n();
     auto ldh_ = props->get_ldh();
 
+#ifdef HAS_UM
+    T *V_m, *H_m;
+    Base<T>* Lambda_m;
+    cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
+
+    auto V = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
+    auto Lambda =
+        std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
+    auto H = std::vector<T>(H_m, H_m + ldh_ * n_);
+#else
     auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
-    auto H = std::vector<T>(ldh_ * n_);
+    auto H = std::vector<T>(ldh_ * n_);            // eigevectors
+#endif
 
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
 
@@ -132,6 +145,13 @@ int main(int argc, char** argv)
                       << std::setw(width) << resid[i] << "  |\n";
         std::cout << "\n\n\n";
     }
+
+#ifdef HAS_UM
+    /*Free the memory of the matrix*/
+    cudaFree(V_m);
+    cudaFree(H_m);
+    cudaFree(Lambda_m);
+#endif
 
     MPI_Finalize();
 }

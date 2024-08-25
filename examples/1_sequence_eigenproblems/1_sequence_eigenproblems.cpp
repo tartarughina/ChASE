@@ -244,7 +244,7 @@ int main(int argc, char** argv)
 
     MPI_Finalize();
 
-#ifdef UM
+#ifdef HAS_UM
     /*Free the memory of the matrix*/
     cudaFree(V_m);
     cudaFree(H_m);
