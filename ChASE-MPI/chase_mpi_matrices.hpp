@@ -145,12 +145,12 @@ public:
 
         cudaMallocManaged(&ptr_, size_ * sizeof(T));
 
-        cudaMemAdvise(ptr_, m_ * (nev + nex) * sizeof(T),
+        cudaMemAdvise(ptr_, size_ * sizeof(T),
                       cudaMemAdviseSetPreferredLocation, device_);
-        cudaMemAdvise(ptr_, m_ * (nev + nex) * sizeof(T),
-                      cudaMemAdviseSetAccessedBy, device_);
-        cudaMemAdvise(ptr_, m_ * (nev + nex) * sizeof(T),
-                      cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
+        cudaMemAdvise(ptr_, size_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                      device_);
+        cudaMemAdvise(ptr_, size_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                      cudaCpuDeviceId);
 
         cudaMemset(ptr_, 0, size_ * sizeof(T));
     }
