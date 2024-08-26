@@ -92,6 +92,32 @@ int main(int argc, char** argv)
     auto Lambda =
         std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
     auto H = std::vector<T>(H_m, H_m + ldh_ * n_);
+
+#ifdef HAS_TUNING
+    int device;
+    cudaGetDevice(&device);
+    cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
+
+    cudaMemAdvise(H_m, m_ * ldh_ * n_ * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(H_m, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(H_m, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
+
+    cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, device);
+    cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
+
+#endif
 #else
     auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues

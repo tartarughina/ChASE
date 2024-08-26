@@ -194,6 +194,32 @@ int do_chase(ChASE_DriverProblemConfig& conf)
     cudaMallocManaged((void**)&V, m_ * (nev + nex) * sizeof(T));
     cudaMallocManaged((void**)&Lambda, (nev + nex) * sizeof(Base<T>));
     cudaMallocManaged((void**)&H, ldh_ * n_ * sizeof(T));
+
+#ifdef HAS_TUNING
+    int device;
+    cudaGetDevice(&device);
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
+
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
+
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, device);
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
+
+#endif
 #else
     auto V__ = std::unique_ptr<T[]>(new T[m_ * (nev + nex)]);
     auto Lambda__ = std::unique_ptr<Base<T>[]>(new Base<T>[(nev + nex)]);

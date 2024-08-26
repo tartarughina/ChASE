@@ -142,7 +142,16 @@ public:
         int dev;
         cudaGetDevice(&dev);
         device_ = dev;
+
         cudaMallocManaged(&ptr_, size_ * sizeof(T));
+
+        cudaMemAdvise(ptr_, m_ * (nev + nex) * sizeof(T),
+                      cudaMemAdviseSetPreferredLocation, device_);
+        cudaMemAdvise(ptr_, m_ * (nev + nex) * sizeof(T),
+                      cudaMemAdviseSetAccessedBy, device_);
+        cudaMemAdvise(ptr_, m_ * (nev + nex) * sizeof(T),
+                      cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
+
         cudaMemset(ptr_, 0, size_ * sizeof(T));
     }
 
