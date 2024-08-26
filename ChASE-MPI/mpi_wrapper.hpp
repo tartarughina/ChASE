@@ -163,13 +163,13 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count,
 #if defined(HAS_UM)
 #if defined(HAS_TUNING)
         case CPY_D2D:
-            cudaMemPrefecthAsync(src, count, device_id);
+            cudaMemPrefetchAsync(src, count, device_id);
             break;
         case CPY_D2H:
-            cudaMemPrefecthAsync(src, count, cudaCpuDeviceId);
+            cudaMemPrefetchAsync(src, count, cudaCpuDeviceId);
             break;
         case CPY_H2D:
-            cudaMemPrefecthAsync(src, count, device_id);
+            cudaMemPrefetchAsync(src, count, device_id);
             break;
 #else
         case CPY_D2D:
