@@ -315,7 +315,7 @@ public:
     {
 #if defined(HAS_UM) && defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
-                             Device_.dev_id(), 0);
+                             Device_.get()->dev_id(), 0);
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing
 #else
@@ -329,7 +329,8 @@ public:
 #if defined(HAS_UM) && defined(HAS_TUNING)
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
-                             nrows * ncols * sizeof(T), Device_.dev_id(), 0);
+                             nrows * ncols * sizeof(T), Device_.get()->dev_id(),
+                             0);
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing since UM is enabled but no tuning is required
 #else
@@ -414,7 +415,8 @@ public:
 #if defined(HAS_UM) && defined(HAS_TUNING)
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
-                             nrows * ncols * sizeof(T), Device_.dev_id(), 0);
+                             nrows * ncols * sizeof(T), Device_.get()->dev_id(),
+                             0);
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing since UM is enabled but no tuning is required
 #else
@@ -431,7 +433,7 @@ public:
 #if defined(HAS_CUDA)
 #if defined(HAS_UM) && defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
-                             Device_.dev_id(), 0);
+                             Device_.get()->dev_id(), 0);
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing
 #else
