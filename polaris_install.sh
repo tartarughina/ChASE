@@ -11,6 +11,8 @@ cmake .. \
 -DCUDA_cusolver_LIBRARY=${NVIDIA_PATH}/math_libs/lib64/libcusolver.so \
 -DCUDA_curand_LIBRARY=${NVIDIA_PATH}/math_libs/lib64/libcurand.so \
 -DCHASE_OUTPUT=ON
+# -DSCALAPACK_DIR=${NVIDIA_PATH}/comm_libs/mpi \
+
 
 # Unified Memory ChASE build
 

@@ -36,6 +36,9 @@ typedef ChaseMpi<ChaseMpiDLABlaslapack, T> CHASE;
 #endif
 int main(int argc, char** argv)
 {
+#if defined(HAS_UM)
+    printf("Check HAS_UM\n");
+#endif
     MPI_Init(&argc, &argv);
     int rank = 0, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
