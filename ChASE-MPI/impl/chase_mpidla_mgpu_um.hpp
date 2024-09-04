@@ -330,6 +330,8 @@ public:
         cusolverDnCreate(&cusolverH_);
         cublasSetPointerMode(cublasH2_, CUBLAS_POINTER_MODE_DEVICE);
         cuda_exec(cudaMallocManaged((void**)&devInfo_, sizeof(int)));
+        /* Initialized so that the memory is not just allocated */
+        *devInfo_ = 0;
         int lwork_heevd = 0;
         cusolver_status_ = cusolverDnTheevd_bufferSize(
             cusolverH_, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER,
@@ -680,6 +682,8 @@ public:
         // int info = 0;
         if (isinfo)
         {
+            /* Ensure that the value for devInfo is available on the CPU */
+            cudaDeviceSynchronize();
             printf("Info inside potrf: %d\n", *devInfo_);
             return *devInfo_;
         }
