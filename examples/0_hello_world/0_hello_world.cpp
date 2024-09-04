@@ -101,7 +101,7 @@ int main(int argc, char** argv)
     auto m_ = props->get_m();
     auto n_ = props->get_n();
     auto ldh_ = props->get_ldh();
-
+    std::cout << "Retrieval of matrix prop complete" << std::end;
 #ifdef HAS_UM
     printf("Reached mallocManaged\n");
     T *V_m, *H_m;
