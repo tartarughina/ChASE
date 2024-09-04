@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# To suppress all warnings during installation
+# make CXXFLAGS="-w" install
+
 # Normal ChASE build
 
 cmake .. \

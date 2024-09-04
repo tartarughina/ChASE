@@ -141,10 +141,8 @@ int main(int argc, char** argv)
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
     auto H = std::vector<T>(ldh_ * n_);            // eigevectors
 #endif
-    printf("mallocManaged done\n");
-    printf("Creation of Chase obj\n");
+
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
-    printf("Chase obj created\n");
     std::vector<T> Clement(N * N, T(0.0));
 
     /*Generate Clement matrix*/
