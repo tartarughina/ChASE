@@ -96,7 +96,7 @@ int main(int argc, char** argv)
 #endif
     printf("Completed MpiProperties initialization\n");
 
-    std::cout << props;
+    std::cout << props << std::endl;
 
     auto m_ = props->get_m();
     auto n_ = props->get_n();
@@ -147,10 +147,11 @@ int main(int argc, char** argv)
     auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
     auto H = std::vector<T>(ldh_ * n_);            // eigevectors
-    printf("Completed standard vector allocation");
+    printf("Completed standard vector allocation\n");
 #endif
-    printf("Reached single definition and clement matrix generation\n");
+    printf("Reached single definition\n");
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
+    printf("Completed single definition\n");
     std::vector<T> Clement(N * N, T(0.0));
 
     /*Generate Clement matrix*/
