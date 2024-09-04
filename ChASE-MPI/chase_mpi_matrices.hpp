@@ -200,7 +200,7 @@ public:
         : m_(m), n_(n), ld_(m), mode_(mode)
     {
         printf("Matrix creation\n");
-        printf("Mode: %d\nm: %d\nn: %d\nld: %ld", mode, m, n, ld_);
+        printf("Mode: %d\nm: %d\nn: %d\nld: %ld\n", mode, m, n, ld_);
         switch (mode)
         {
 #if defined(HAS_UM)
@@ -539,14 +539,18 @@ public:
             onlyGPU = 3;
         }
 #endif
-
+        printf("Creating H from H\n");
         H___ = std::make_unique<Matrix<T>>(isGPU, N, N, H, ldh);
+        printf("Creating C from V1\n");
         C___ = std::make_unique<Matrix<T>>(isGPU, N, max_block, V1, N);
+        printf("Creating B\n");
         B___ = std::make_unique<Matrix<T>>(onlyGPU, N, max_block);
+        printf("Creating A\n");
         A___ = std::make_unique<Matrix<T>>(onlyGPU, max_block, max_block);
-
+        printf("Creating Ritzv from ritzv\n");
         Ritzv___ = std::make_unique<Matrix<Base<T>>>(isGPU, 1, max_block, ritzv,
                                                      max_block);
+        printf("Creating resid\n");
         Resid___ = std::make_unique<Matrix<Base<T>>>(isGPU, 1, max_block);
     }
 
@@ -611,16 +615,24 @@ public:
             isCUDA_Aware = 3;
         }
 #endif
-
+        printf("Creating H from H\n");
         H___ = std::make_unique<Matrix<T>>(isGPU, m, n, H, ldh);
+        printf("Creating C from V1\n");
         C___ = std::make_unique<Matrix<T>>(isCUDA_Aware, m, max_block, V1, m);
+        printf("Creating C2\n");
         C2___ = std::make_unique<Matrix<T>>(isCUDA_Aware, m, max_block);
+        printf("Creating B\n");
         B___ = std::make_unique<Matrix<T>>(isCUDA_Aware, n, max_block);
+        printf("Creating B2\n");
         B2___ = std::make_unique<Matrix<T>>(isCUDA_Aware, n, max_block);
+        printf("Creating A\n");
         A___ = std::make_unique<Matrix<T>>(isCUDA_Aware, max_block, max_block);
+        printf("Creating Ritzv from ritzv\n");
         Ritzv___ = std::make_unique<Matrix<Base<T>>>(isGPU, 1, max_block, ritzv,
                                                      max_block);
+        printf("Creating resid\n");
         Resid___ = std::make_unique<Matrix<Base<T>>>(isGPU, 1, max_block);
+        printf("Creating vv\n");
         vv___ = std::make_unique<Matrix<T>>(isGPU, m, 1);
     }
 
