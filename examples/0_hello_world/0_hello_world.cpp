@@ -82,7 +82,7 @@ int main(int argc, char** argv)
         n = std::min(N, N / dims[1] + 1);
     }
 #endif
-
+    printf("Reached MpiProperties\n");
     /*construct eigenproblem to be solved*/
 #ifdef USE_BLOCK_CYCLIC
     auto props =
@@ -94,7 +94,7 @@ int main(int argc, char** argv)
 #else
     auto props = new ChaseMpiProperties<T>(N, nev, nex, MPI_COMM_WORLD);
 #endif
-
+    printf("Completed MpiProperties initialization\n");
     auto m_ = props->get_m();
     auto n_ = props->get_n();
     auto ldh_ = props->get_ldh();
@@ -141,7 +141,7 @@ int main(int argc, char** argv)
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
     auto H = std::vector<T>(ldh_ * n_);            // eigevectors
 #endif
-
+    printf("Reached single definition and clement matrix generation\n");
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
     std::vector<T> Clement(N * N, T(0.0));
 
@@ -154,7 +154,7 @@ int main(int argc, char** argv)
         if (i != N - 1)
             Clement[i + N * (i + 1)] = std::sqrt(i * (N + 1 - i));
     }
-
+    printf("Completed Clement matrix generation\n");
     if (rank == 0)
     {
         std::cout << "Starting Problem #1"
@@ -226,12 +226,12 @@ int main(int argc, char** argv)
 #endif
                   << '\n'
                   << config;
-
+    printf("Reached performance decorator\n");
     /*Performance Decorator to meaure the performance of kernels of ChASE*/
     PerformanceDecoratorChase<T> performanceDecorator(&single);
     /*Solve the eigenproblem*/
     chase::Solve(&performanceDecorator);
-
+    printf("Completed solving the eigenproblem\n");
     /*Output*/
     if (rank == 0)
     {
