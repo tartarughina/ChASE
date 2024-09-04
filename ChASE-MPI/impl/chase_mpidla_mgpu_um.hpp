@@ -331,7 +331,7 @@ public:
         cublasSetPointerMode(cublasH2_, CUBLAS_POINTER_MODE_DEVICE);
         cuda_exec(cudaMallocManaged((void**)&devInfo_, sizeof(int)));
         /* Initialized so that the memory is not just allocated */
-        *devInfo_ = 0;
+        // *devInfo_ = 0;
         int lwork_heevd = 0;
         cusolver_status_ = cusolverDnTheevd_bufferSize(
             cusolverH_, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER,

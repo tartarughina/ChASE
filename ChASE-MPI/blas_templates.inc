@@ -1182,7 +1182,7 @@ std::size_t t_stemr(int matrix_layout, char jobz, char range, std::size_t n,
     FC_GLOBAL(dstemr, DSTEMR)
     (&jobz, &range, &n_, d, e, &vl, &vu, &il_, &iu_, m, w, z, &ldz_, &nzc_,
      isuppz, tryrac, work, &lwork, iwork, &liwork, &info);
-
+    printf("blas inc info = %d\n", info);
     assert(info == 0);
     return info;
 }
@@ -1751,9 +1751,9 @@ void t_ptranc(std::size_t m, std::size_t n, float alpha, float *A, int ia, int j
         desc_c_[i] = static_cast<std::size_t>(desc_c[i]);
     }
     BlasInt m_ = m;
-    BlasInt n_ = n;   
+    BlasInt n_ = n;
 
-    pstran_(&m_, &n_, &alpha, A, &ia, &ja, desc_a_, &beta, C, &ic, &jc, desc_c_); 
+    pstran_(&m_, &n_, &alpha, A, &ia, &ja, desc_a_, &beta, C, &ic, &jc, desc_c_);
 }
 
 template <>
@@ -1769,9 +1769,9 @@ void t_ptranc(std::size_t m, std::size_t n, double alpha, double *A, int ia, int
         desc_c_[i] = static_cast<std::size_t>(desc_c[i]);
     }
     BlasInt m_ = m;
-    BlasInt n_ = n;   
+    BlasInt n_ = n;
 
-    pdtran_(&m_, &n_, &alpha, A, &ia, &ja, desc_a_, &beta, C, &ic, &jc, desc_c_); 
+    pdtran_(&m_, &n_, &alpha, A, &ia, &ja, desc_a_, &beta, C, &ic, &jc, desc_c_);
 }
 
 template <>
@@ -1787,9 +1787,9 @@ void t_ptranc(std::size_t m, std::size_t n, std::complex<float> alpha, std::comp
         desc_c_[i] = static_cast<std::size_t>(desc_c[i]);
     }
     BlasInt m_ = m;
-    BlasInt n_ = n;   
+    BlasInt n_ = n;
 
-    pctranc_(&m_, &n_, &alpha, A, &ia, &ja, desc_a_, &beta, C, &ic, &jc, desc_c_); 
+    pctranc_(&m_, &n_, &alpha, A, &ia, &ja, desc_a_, &beta, C, &ic, &jc, desc_c_);
 }
 
 template <>
@@ -1805,9 +1805,9 @@ void t_ptranc(std::size_t m, std::size_t n, std::complex<double> alpha, std::com
         desc_c_[i] = static_cast<std::size_t>(desc_c[i]);
     }
     BlasInt m_ = m;
-    BlasInt n_ = n;   
+    BlasInt n_ = n;
 
-    pztranc_(&m_, &n_, &alpha, A, &ia, &ja, desc_a_, &beta, C, &ic, &jc, desc_c_); 
+    pztranc_(&m_, &n_, &alpha, A, &ia, &ja, desc_a_, &beta, C, &ic, &jc, desc_c_);
 }
 
 #endif
