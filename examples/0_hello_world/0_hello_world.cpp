@@ -106,10 +106,9 @@ int main(int argc, char** argv)
     printf("Reached mallocManaged\n");
     T *V_m, *H_m;
     Base<T>* Lambda_m;
-    cuda_exec(cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T)));
-    cuda_exec(
-        cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>)));
-    cuda_exec(cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T)));
+    cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
     printf("Completed mallocManaged\n");
     auto V = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
     auto Lambda =
