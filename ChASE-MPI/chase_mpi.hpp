@@ -424,6 +424,7 @@ public:
             {
                 info = dla_->cholQR2(locked_);
             }
+            printf("Info: %d", info);
 
             if (info != 0)
             {

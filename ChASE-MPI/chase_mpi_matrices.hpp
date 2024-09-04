@@ -199,8 +199,6 @@ public:
     Matrix(int mode, std::size_t m, std::size_t n)
         : m_(m), n_(n), ld_(m), mode_(mode)
     {
-        printf("Matrix creation\n");
-        printf("Mode: %d\nm: %d\nn: %d\nld: %ld\n", mode, m, n, ld_);
         switch (mode)
         {
 #if defined(HAS_UM)

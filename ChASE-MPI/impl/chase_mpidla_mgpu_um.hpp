@@ -680,6 +680,7 @@ public:
         // int info = 0;
         if (isinfo)
         {
+            printf("Info inside potrf: %d\n", *devInfo_);
             return *devInfo_;
         }
 
