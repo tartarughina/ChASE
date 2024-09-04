@@ -95,6 +95,9 @@ int main(int argc, char** argv)
     auto props = new ChaseMpiProperties<T>(N, nev, nex, MPI_COMM_WORLD);
 #endif
     printf("Completed MpiProperties initialization\n");
+
+    std::cout << props;
+
     auto m_ = props->get_m();
     auto n_ = props->get_n();
     auto ldh_ = props->get_ldh();
