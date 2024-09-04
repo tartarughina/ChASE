@@ -513,6 +513,7 @@ public:
         std::vector<int> isuppz(2 * M);
         std::vector<Base<T>> ritzv(M);
 
+        printf("Naughty boy will crash right here");
         t_stemr<Base<T>>(LAPACK_COL_MAJOR, 'N', 'A', M, d.data(), e.data(), ul,
                          ll, vl, vu, &notneeded_m, ritzv.data(), NULL, M, M,
                          isuppz.data(), &tryrac);
