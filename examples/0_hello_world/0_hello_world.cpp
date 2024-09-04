@@ -100,17 +100,18 @@ int main(int argc, char** argv)
     auto ldh_ = props->get_ldh();
 
 #ifdef HAS_UM
+    printf("Reached mallocManaged\n");
     T *V_m, *H_m;
     Base<T>* Lambda_m;
     cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
     cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
     cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
-
+    printf("Completed mallocManaged\n");
     auto V = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
     auto Lambda =
         std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
     auto H = std::vector<T>(H_m, H_m + ldh_ * n_);
-
+    printf("Associated cuda pointer to vector\n");
 #ifdef HAS_TUNING
     int device;
     cudaGetDevice(&device);
@@ -135,11 +136,15 @@ int main(int argc, char** argv)
     cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
                   cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
 
+    printf("Successfully advised memory\n");
+
 #endif
 #else
+    printf("Reached standard definition\n");
     auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
     auto H = std::vector<T>(ldh_ * n_);            // eigevectors
+    printf("Completed standard vector allocation");
 #endif
     printf("Reached single definition and clement matrix generation\n");
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
