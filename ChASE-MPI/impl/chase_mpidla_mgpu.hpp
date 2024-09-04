@@ -273,7 +273,7 @@ public:
               matrix_properties->create_matrices(1, H, ldh, V1, ritzv)))
 #endif
     {
-        cout << "ChaseMpiDLAMultiGPU: Init" << endl;
+        std::cout << "ChaseMpiDLAMultiGPU: Init" << std::endl;
 #ifdef USE_NSIGHT
         nvtxRangePushA("ChaseMpiDLAMultiGPU: Init");
 #endif
