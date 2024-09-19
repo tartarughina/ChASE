@@ -14,11 +14,7 @@
 #include "ChASE-MPI/chase_mpi.hpp"
 #include "algorithm/performance.hpp"
 
-#include "ChASE-MPI/impl/chase_mpidla_blaslapack_seq.hpp"
-#include "ChASE-MPI/impl/chase_mpidla_blaslapack_seq_inplace.hpp"
-#if defined(USE_GPU)
 #include "ChASE-MPI/impl/chase_mpidla_cuda_seq.hpp"
-#endif
 
 using T = std::complex<double>;
 // using T = double;
@@ -28,7 +24,7 @@ using namespace chase::mpi;
 #if defined(USE_GPU)
 typedef ChaseMpi<ChaseMpiDLACudaSeq, T> CHASE;
 #else
-//typedef ChaseMpi<ChaseMpiDLABlaslapackSeq, T> CHASE;
+// typedef ChaseMpi<ChaseMpiDLABlaslapackSeq, T> CHASE;
 typedef ChaseMpi<ChaseMpiDLABlaslapackSeqInplace, T> CHASE;
 #endif
 
@@ -63,7 +59,7 @@ int main()
     config.SetDeg(20);
     config.SetOpt(true);
     config.SetApprox(false);
-    
+
     if (rank == 0)
         std::cout << "Solving " << idx_max << " symmetrized Clement matrices ("
                   << N << "x" << N
@@ -80,7 +76,7 @@ int main()
         if (i != N - 1)
             H[i + LDH * (i + 1)] = std::sqrt(i * (N + 1 - i));
     }
-    
+
     for (auto idx = 0; idx < idx_max; ++idx)
     {
         if (rank == 0)
