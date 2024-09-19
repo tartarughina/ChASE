@@ -48,7 +48,7 @@ public:
 #endif
 
         cudaMemset(ptr_, 0, size_ * sizeof(T));
-        cudeDeviceSynchronize();
+        cudaDeviceSynchronize();
     }
 
     UnifiedMem(T* ptr, std::size_t size)
@@ -140,7 +140,7 @@ public:
     void swap(Matrix<T>& swapping_obj)
     {
         std::swap(Host_, swapping_obj.Host_);
-        cudeDeviceSynchronize();
+        cudaDeviceSynchronize();
     }
 
 #if defined(HAS_CUDA)
@@ -161,7 +161,7 @@ public:
 #if defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              Device_.get()->dev_id(), 0);
-        cudeDeviceSynchronize();
+        cudaDeviceSynchronize();
 #endif
     }
 
@@ -172,7 +172,7 @@ public:
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), Device_.get()->dev_id(),
                              0);
-        cudeDeviceSynchronize();
+        cudaDeviceSynchronize();
 
 #endif
     }
@@ -183,7 +183,7 @@ public:
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              cudaCpuDeviceId, 0);
-        cudeDeviceSynchronize();
+        cudaDeviceSynchronize();
 
 #endif
     }
@@ -194,7 +194,7 @@ public:
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), cudaCpuDeviceId, 0);
-        cudeDeviceSynchronize();
+        cudaDeviceSynchronize();
 
 #endif
     }
@@ -206,7 +206,7 @@ public:
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), cudaCpuDeviceId, 0);
-        cudeDeviceSynchronize();
+        cudaDeviceSynchronize();
 
 #endif
     }
@@ -217,7 +217,7 @@ public:
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              cudaCpuDeviceId, 0);
-        cudeDeviceSynchronize();
+        cudaDeviceSynchronize();
 
 #endif
     }
@@ -239,7 +239,7 @@ public:
 #if defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              Device_.get()->dev_id(), 0);
-        cudeDeviceSynchronize();
+        cudaDeviceSynchronize();
 
 #endif
     }
