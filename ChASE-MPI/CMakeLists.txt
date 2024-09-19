@@ -9,14 +9,6 @@ option(ENABLE_MPI_IO "Enable MPI IO to read Hamiltonian matrix from local" ON)
 
 option(ENABLE_TUNING "Enable UM Tuning" OFF)
 
-add_library( chase_seq INTERFACE )
-target_link_libraries(chase_seq INTERFACE chase_algorithm)
-target_compile_definitions(chase_seq INTERFACE NO_MPI=1 )
-
-
-add_library( chase_mpi INTERFACE )
-target_link_libraries(chase_mpi INTERFACE chase_algorithm)
-
 #underscores for FORTRAN
 enable_language( Fortran )
 include( FortranCInterface )
@@ -27,74 +19,12 @@ FortranCInterface_HEADER( ${CMAKE_BINARY_DIR}/fortran_mangle.h
 
 list(APPEND includePath ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_include_directories( chase_seq INTERFACE
-  "$<BUILD_INTERFACE:${includePath}>"
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>  # <prefix>/include/ChASE-MPI
-)
-
-target_include_directories( chase_mpi INTERFACE
-  "$<BUILD_INTERFACE:${includePath}>"
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>  # <prefix>/include/ChASE-MPI
-)
-
 # # BLAS / LAPACK # #
 find_package( BLAS   REQUIRED )
 find_package( LAPACK REQUIRED )
 find_package( MPI    REQUIRED )
 
 find_package( SCALAPACK )
-
-target_include_directories( chase_seq INTERFACE
-  ${MPI_CXX_INCLUDE_PATH}
-  )
-
-target_link_libraries( chase_seq INTERFACE
-  ${BLAS_LIBRARIES}
-  ${LAPACK_LIBRARIES}
-  ${MPI_CXX_LIBRARIES}
-  )
-
-if(SCALAPACK_FOUND)
-    target_link_libraries( chase_seq INTERFACE
-   ${SCALAPACK_LIBRARIES}
-   )
-endif()
-
-target_compile_options( chase_seq INTERFACE
-  ${MPI_CXX_COMPILE_FLAGS}
-  )
-
-target_include_directories( chase_mpi INTERFACE
-  ${MPI_CXX_INCLUDE_PATH}
-  )
-
-target_link_libraries( chase_mpi INTERFACE
-  ${BLAS_LIBRARIES}
-  ${LAPACK_LIBRARIES}
-  ${MPI_CXX_LIBRARIES}
-  )
-
-target_compile_options( chase_mpi INTERFACE
-  ${MPI_CXX_COMPILE_FLAGS}
-  )
-if(SCALAPACK_FOUND)
-    target_link_libraries( chase_mpi INTERFACE
-        ${SCALAPACK_LIBRARIES}
-        )
-    target_compile_definitions( chase_mpi INTERFACE
-   "-DHAS_SCALAPACK"
- )
-endif()
-
-target_compile_definitions( chase_mpi INTERFACE
-   "-DUSE_MPI"
-        )
-
-if(ENABLE_MPI_IO)
-    target_compile_definitions( chase_mpi INTERFACE
-     "-DUSE_MPI_IO"
- )
-endif()
 
 include(CheckLanguage)
 check_language(CUDA)
@@ -167,14 +97,6 @@ if(CMAKE_CUDA_COMPILER)
     ${CUDA_nvToolsExt_LIBRARY}
     )
 
-    target_link_libraries( chase_mpi INTERFACE
-    ${CUDA_nvToolsExt_LIBRARY}
-    )
-
-    target_link_libraries( chase_seq INTERFACE
-    ${CUDA_nvToolsExt_LIBRARY}
-    )
-
     target_compile_definitions( chase_cuda INTERFACE
    "-DHAS_CUDA"
         )
@@ -210,9 +132,6 @@ if(CMAKE_CUDA_COMPILER)
 
     if(ENABLE_NSIGHT)
         target_compile_definitions(chase_cuda INTERFACE USE_NSIGHT)
-        target_compile_definitions(chase_seq  INTERFACE USE_NSIGHT)
-        target_compile_definitions(chase_mpi INTERFACE USE_NSIGHT)
-        target_compile_definitions(chase_algorithm INTERFACE USE_NSIGHT)
     endif()
 
     install( TARGETS chase_cuda
@@ -236,27 +155,6 @@ else()
     endif()
 endif()
 
-install( TARGETS chase_seq
-  EXPORT chase-seq
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  )
-
-install(EXPORT chase-seq
-  NAMESPACE ChASE::
-  FILE chase-seq.cmake
-  EXPORT_LINK_INTERFACE_LIBRARIES
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
-  )
-
-install( TARGETS chase_mpi
-  EXPORT chase-mpi
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  )
-
 install(DIRECTORY . DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ChASE-MPI/
   FILES_MATCHING
     PATTERN "*.hpp"
@@ -265,11 +163,4 @@ install(DIRECTORY . DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ChASE-MPI/
 
 install( FILES  ${CMAKE_BINARY_DIR}/fortran_mangle.h
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  )
-
-install(EXPORT chase-mpi
-  NAMESPACE ChASE::
-  FILE chase-mpi.cmake
-  EXPORT_LINK_INTERFACE_LIBRARIES
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
   )
