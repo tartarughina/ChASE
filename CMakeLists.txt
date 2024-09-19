@@ -52,7 +52,7 @@ install(EXPORT chase-headers
 add_subdirectory( "ChASE-MPI/")
 
 ## Tests
-add_executable( "chase_driver" tests/noinput.cpp )
+# add_executable( "chase_driver" tests/noinput.cpp )
 if(TARGET chase_cuda )
   enable_language(CUDA)
   target_link_libraries(chase_driver chase_mpi chase_cuda)
