@@ -6,8 +6,8 @@ cmake_minimum_required( VERSION 3.8 )
 option(ENABLE_CUDA_AWARE_MPI "Enable CUDA aware MPI for collective communications" ON)
 option(ENABLE_NCCL "Enable Nvidia NCCL for collective communications" ON)
 option(ENABLE_MPI_IO "Enable MPI IO to read Hamiltonian matrix from local" ON)
-option(ENABLE_UM "Enable Unified Memory for CUDA" OFF)
-option(ENABLE_TUNING "Enable UM Tuning, requires ENABLE_UM" OFF)
+
+option(ENABLE_TUNING "Enable UM Tuning" OFF)
 
 add_library( chase_seq INTERFACE )
 target_link_libraries(chase_seq INTERFACE chase_algorithm)
@@ -103,13 +103,11 @@ if(CMAKE_CUDA_COMPILER)
     if (${CMAKE_VERSION} VERSION_LESS_EQUAL "3.18.0")
         find_package(CUDA REQUIRED)
     elseif(${CMAKE_VERSION} VERSION_GREATER "3.18.0")
-        find_package(CUDAToolkit REQUIRED)
-        # the libraries below have issues compiling with NVHPC
-        # and the CMake version available on Polaris
-        # as a workaround set them manually
-        # set(CUDA_CUBLAS_LIBRARIES CUDA::cublas)
-        # set(CUDA_cusolver_LIBRARY CUDA::cusolver)
-        # set(CUDA_curand_LIBRARY CUDA::curand)
+        string(REPLACE "compilers/bin/nvcc" "cmake" NVHPC_CMAKE_DIR ${CMAKE_CUDA_COMPILER})
+        set(CMAKE_PREFIX_PATH ${NVHPC_CMAKE_DIR})
+        message(STATUS "NVHPC CMake Directory: ${NVHPC_CMAKE_DIR}")
+        message(STATUS "CMake Prefix Path set to: ${CMAKE_PREFIX_PATH}")
+        find_package(NVHPC REQUIRED COMPONENTS CUDA MATH)
     endif()
 
     enable_language(CUDA)
@@ -157,20 +155,22 @@ if(CMAKE_CUDA_COMPILER)
       chase_cuda
       PUBLIC #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
              $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ChASE-MPI>)
-
+    string(REGEX REPLACE "(.+)(\/lib64)$" "\\1/include" NVHPC_CUDA_INCLUDE_DIR ${NVHPC_CUDA_LIBRARY_DIR})
+    string(REGEX REPLACE "(.+)(\/lib64)$" "\\1/include" NVHPC_MATH_INCLUDE_DIR ${NVHPC_MATH_LIBRARY_DIR})
     target_include_directories( chase_cuda INTERFACE
-    ${CUDA_INCLUDE_DIRS}
-    ${MATH_LIBS_INCLUDE_DIR}
-    )
+    ${NVHPC_CUDA_INCLUDE_DIR} ${NVHPC_MATH_INCLUDE_DIR})
+
     target_link_libraries( chase_cuda INTERFACE
-    ${CUDA_CUBLAS_LIBRARIES}
-    ${CUDA_cusolver_LIBRARY}
-    ${CUDA_curand_LIBRARY}
+    NVHPC::CUBLAS
+    NVHPC::CUSOLVER
+    NVHPC::CURAND
     ${CUDA_nvToolsExt_LIBRARY}
     )
+
     target_link_libraries( chase_mpi INTERFACE
     ${CUDA_nvToolsExt_LIBRARY}
     )
+
     target_link_libraries( chase_seq INTERFACE
     ${CUDA_nvToolsExt_LIBRARY}
     )
@@ -179,43 +179,32 @@ if(CMAKE_CUDA_COMPILER)
    "-DHAS_CUDA"
         )
 
-    # Enforce that ENABLE_TUNING requires ENABLE_UM
-    if(ENABLE_TUNING AND NOT ENABLE_UM)
-        message(FATAL_ERROR "ENABLE_TUNING requires ENABLE_UM to be ON. Please set -DENABLE_UM=ON.")
-    endif()
-
-    if(ENABLE_UM)
-        message(INFO "Unified Memory (UM) enabled.")
+    if(ENABLE_TUNING)
         target_compile_definitions( chase_cuda INTERFACE
-              "-DHAS_UM"
-              )
-        if(ENABLE_TUNING)
-            message(INFO "Unified Memory Tuning (UMT) enabled.")
-            target_compile_definitions( chase_cuda INTERFACE
-                  "-DHAS_TUNING"
-                  )
-        endif()
+            "-DHAS_TUNING"
+          )
     endif()
-
     if(ENABLE_CUDA_AWARE_MPI)
         target_compile_definitions( chase_cuda INTERFACE
             "-DCUDA_AWARE"
           )
 
         if(ENABLE_NCCL)
-            find_package( NCCL REQUIRED )
-        endif()
-
-        if(NCCL_FOUND)
+            find_package( NVHPC REQUIRED COMPONENTS NCCL )
+            find_library(NCCL_LIBRARY
+                NAMES nccl
+                HINTS ${NVHPC_NCCL_LIBRARY_DIR}
+            )
+            string(REGEX REPLACE "(.+)(\/lib)$" "\\1/include" NCCL_INCLUDE_DIR ${NVHPC_NCCL_LIBRARY_DIR})
             target_link_libraries(chase_cuda INTERFACE
-              ${NCCL_LIBRARIES}
-              )
-            target_include_directories( chase_cuda INTERFACE
-              ${NCCL_INCLUDE_DIRS}
-              )
-            target_compile_definitions( chase_cuda INTERFACE
-              "-DHAS_NCCL"
+          ${NCCL_LIBRARY}
           )
+            target_include_directories( chase_cuda INTERFACE
+          ${NCCL_INCLUDE_DIR}
+          )
+            target_compile_definitions( chase_cuda INTERFACE
+          "-DHAS_NCCL"
+      )
         endif()
     endif()
 

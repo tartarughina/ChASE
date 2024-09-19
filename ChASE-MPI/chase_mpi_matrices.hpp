@@ -427,6 +427,7 @@ public:
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), Device_.get()->dev_id(),
                              0);
+        cudaDeviceSynchronize();
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing since UM is enabled but no tuning is required
 #else
