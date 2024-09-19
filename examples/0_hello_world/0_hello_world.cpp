@@ -12,15 +12,8 @@
 
 /*include ChASE headers*/
 #include "ChASE-MPI/chase_mpi.hpp"
-#include "algorithm/performance.hpp"
-
-#include "ChASE-MPI/impl/chase_mpidla_blaslapack.hpp"
-#ifdef DRIVER_BUILD_MGPU
-#ifdef HAS_UM
-#include "ChASE-MPI/impl/chase_mpidla_mgpu_um.hpp"
-#else
 #include "ChASE-MPI/impl/chase_mpidla_mgpu.hpp"
-#endif
+#include "algorithm/performance.hpp"
 
 #endif
 
@@ -28,17 +21,10 @@ using T = std::complex<double>;
 using namespace chase;
 using namespace chase::mpi;
 
-/*use ChASE-MPI without GPU support*/
-#ifdef DRIVER_BUILD_MGPU
 typedef ChaseMpi<ChaseMpiDLAMultiGPU, T> CHASE;
-#else
-typedef ChaseMpi<ChaseMpiDLABlaslapack, T> CHASE;
-#endif
+
 int main(int argc, char** argv)
 {
-#if defined(HAS_UM)
-    printf("Check HAS_UM\n");
-#endif
     MPI_Init(&argc, &argv);
     int rank = 0, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -101,9 +87,7 @@ int main(int argc, char** argv)
     auto m_ = props->get_m();
     auto n_ = props->get_n();
     auto ldh_ = props->get_ldh();
-    printf("Retrieval of matrix prop complete\n");
-#ifdef HAS_UM
-    printf("Reached mallocManaged\n");
+
     T *V_m, *H_m;
     Base<T>* Lambda_m;
     cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
@@ -142,14 +126,7 @@ int main(int argc, char** argv)
     printf("Successfully advised memory\n");
 
 #endif
-#else
-    printf("Reached standard definition\n");
-    auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
-    auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
-    auto H = std::vector<T>(ldh_ * n_);            // eigevectors
-    printf("Completed standard vector allocation\n");
-#endif
-    printf("Reached single definition\n");
+
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
     printf("Completed single definition\n");
     std::vector<T> Clement(N * N, T(0.0));

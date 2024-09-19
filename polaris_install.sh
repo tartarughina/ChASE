@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# To suppress all warnings during installation
-# make CXXFLAGS="-w" install
+# The compilation now requires NVHPC for the GPU version of Chase
 
-# Normal ChASE build
+# Normal ChASE build for the non Unified Memory version
+# To
 
 cmake .. \
 -DCMAKE_INSTALL_PREFIX=/home/tartarughina/ChASE-def \
@@ -21,6 +21,7 @@ cmake .. \
 -DCMAKE_INSTALL_PREFIX=/home/tartarughina/ChASE-umt \
 -DBUILD_WITH_EXAMPLES=ON \
 -DENABLE_TUNING=ON
+
 # To ensure a correct build comment out or remove the lines setting cublas, cusolver and curand libraries
 # To enable UM and tuning add the following lines to the cmake command
 # -DENABLE_UM=ON

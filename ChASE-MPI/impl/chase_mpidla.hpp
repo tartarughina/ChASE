@@ -312,7 +312,7 @@ public:
         vv = matrices_->vv_comm();
         rsd = matrices_->Resid_comm();
 
-        if (matrices_->get_Mode() == 2)
+        if (matrices_->get_Mode() == 2 || matrices_->get_Mode() == 3)
         {
             cuda_aware_ = true;
         }
@@ -350,7 +350,9 @@ public:
             auto max_c_len = *max_element(c_lens.begin(), c_lens.end());
             if (cuda_aware_)
             {
-                buff__ = std::make_unique<Matrix<T>>(2, max_c_len, nex_ + nev_);
+                // Cover cuda-aware and unified memory
+                buff__ = std::make_unique<Matrix<T>>(matrices_->get_Mode(),
+                                                     max_c_len, nex_ + nev_);
             }
             else
             {
@@ -1003,8 +1005,6 @@ public:
         nvtxRangePop();
         nvtxRangePushA("memcpy");
 #endif
-        // Within this function if Unified Memory don't do anything if not
-        // prefetching data somewhere
         Memcpy(memcpy_mode[0], C2 + locked * m_, C + locked * m_,
                m_ * block * sizeof(T));
 #ifdef USE_NSIGHT
@@ -1130,7 +1130,7 @@ public:
 
         if (!alloc_)
         {
-            V___ = std::make_unique<Matrix<T>>(0, N_, nevex);
+            V___ = std::make_unique<Matrix<T>>(3, N_, nevex);
             alloc_ = true;
         }
 
@@ -1418,11 +1418,9 @@ public:
         std::vector<T> alpha(numvec, T(1.0));
         std::vector<T> beta(numvec, T(0.0));
 
+        // As the mode is set to 3 unified memory will be used
         int matrix_mode = matrices_->get_Mode();
-        if (matrices_->get_Mode() == 2)
-        {
-            matrix_mode = 1;
-        }
+
         v_0 = new Matrix<T>(matrix_mode, m_, numvec);
         v_1 = new Matrix<T>(matrix_mode, m_, numvec);
         v_2 = new Matrix<T>(matrix_mode, m_, numvec);

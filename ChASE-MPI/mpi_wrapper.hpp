@@ -3,10 +3,8 @@
 #if defined(HAS_NCCL)
 #include <nccl.h>
 #endif
-#if defined(HAS_UM)
 #include <cuda.h>
 #include <cuda_runtime.h>
-#endif
 #include <mpi.h>
 
 namespace chase
@@ -159,36 +157,24 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count,
         case CPY_H2H:
             std::memcpy(dst, src, count);
             break;
-#if defined(CUDA_AWARE)
-#if defined(HAS_UM)
 #if defined(HAS_TUNING)
         case CPY_D2D:
             cudaMemPrefetchAsync(src, count, device_id);
+            cudaDeviceSynchronize();
             break;
         case CPY_D2H:
             cudaMemPrefetchAsync(src, count, cudaCpuDeviceId);
+            cudaDeviceSynchronize();
             break;
         case CPY_H2D:
             cudaMemPrefetchAsync(src, count, device_id);
+            cudaDeviceSynchronize();
             break;
 #else
         case CPY_D2D:
         case CPY_D2H:
         case CPY_H2D:
             break;
-#endif
-#else
-        case CPY_D2D:
-            cudaMemcpy(dst, src, count, cudaMemcpyDeviceToDevice);
-            // cudaDeviceSynchronize();
-            break;
-        case CPY_D2H:
-            cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost);
-            break;
-        case CPY_H2D:
-            cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice);
-            break;
-#endif
 #endif
     }
 }

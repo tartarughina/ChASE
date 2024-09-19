@@ -12,15 +12,8 @@
 
 /*include ChASE headers*/
 #include "ChASE-MPI/chase_mpi.hpp"
-#include "algorithm/performance.hpp"
-
-#include "ChASE-MPI/impl/chase_mpidla_blaslapack.hpp"
-#ifdef DRIVER_BUILD_MGPU
-#ifdef HAS_UM
-#include "ChASE-MPI/impl/chase_mpidla_mgpu_um.hpp"
-#else
 #include "ChASE-MPI/impl/chase_mpidla_mgpu.hpp"
-#endif
+#include "algorithm/performance.hpp"
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
@@ -29,12 +22,7 @@ using T = std::complex<double>;
 using namespace chase;
 using namespace chase::mpi;
 
-/*use ChASE-MPI without GPU support*/
-#ifdef DRIVER_BUILD_MGPU
 typedef ChaseMpi<ChaseMpiDLAMultiGPU, T> CHASE;
-#else
-typedef ChaseMpi<ChaseMpiDLABlaslapack, T> CHASE;
-#endif
 
 int main(int argc, char** argv)
 {
@@ -81,7 +69,6 @@ int main(int argc, char** argv)
     auto n_ = props->get_n();
     auto ldh_ = props->get_ldh();
 
-#ifdef HAS_UM
     T *V_m, *H_m;
     Base<T>* Lambda_m;
     cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
@@ -96,6 +83,7 @@ int main(int argc, char** argv)
 #ifdef HAS_TUNING
     int device;
     cudaGetDevice(&device);
+    printf("Rank %d, device %d\n", rank, device);
     cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T),
                   cudaMemAdviseSetPreferredLocation, device);
     cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
@@ -117,11 +105,6 @@ int main(int argc, char** argv)
     cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
                   cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
 
-#endif
-#else
-    auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
-    auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
-    auto H = std::vector<T>(ldh_ * n_);            // eigevectors
 #endif
 
     // Creation of ChaseMPIDLA and ChaseMPIDLA_MGPU objects
@@ -270,10 +253,8 @@ int main(int argc, char** argv)
 
     MPI_Finalize();
 
-#ifdef HAS_UM
     /*Free the memory of the matrix*/
     cudaFree(V_m);
     cudaFree(H_m);
     cudaFree(Lambda_m);
-#endif
 }
