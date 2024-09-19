@@ -18,15 +18,7 @@
 #include "ChASE-MPI/chase_mpi.hpp"
 #include "algorithm/performance.hpp"
 
-#include "ChASE-MPI/impl/chase_mpidla_blaslapack_seq.hpp"
-#include "ChASE-MPI/impl/chase_mpidla_blaslapack_seq_inplace.hpp"
-
 #ifdef USE_MPI
-#include "ChASE-MPI/impl/chase_mpidla_blaslapack.hpp"
-#ifdef DRIVER_BUILD_MGPU
-#ifdef HAS_UM
-#include "ChASE-MPI/impl/chase_mpidla_mgpu_um.hpp"
-#else
 #include "ChASE-MPI/impl/chase_mpidla_mgpu.hpp"
 #endif
 #include <cuda.h>
@@ -157,15 +149,7 @@ int do_chase(ChASE_DriverProblemConfig& conf)
     //----------------------------------------------------------------------------
     std::cout << std::setprecision(16);
 
-#ifdef USE_MPI
-#if defined(DRIVER_BUILD_MGPU)
     typedef ChaseMpi<ChaseMpiDLAMultiGPU, T> CHASE;
-#else
-    typedef ChaseMpi<ChaseMpiDLABlaslapack, T> CHASE;
-#endif // CUDA or not
-#else
-    typedef ChaseMpi<ChaseMpiDLABlaslapackSeq, T> CHASE;
-#endif // seq ChASE
 
 #ifdef USE_MPI
 #ifdef USE_BLOCK_CYCLIC
@@ -190,7 +174,6 @@ int do_chase(ChASE_DriverProblemConfig& conf)
     T *V, *H;
     Base<T>* Lambda;
 
-#ifdef HAS_UM
     cudaMallocManaged((void**)&V, m_ * (nev + nex) * sizeof(T));
     cudaMallocManaged((void**)&Lambda, (nev + nex) * sizeof(Base<T>));
     cudaMallocManaged((void**)&H, ldh_ * n_ * sizeof(T));
@@ -219,15 +202,6 @@ int do_chase(ChASE_DriverProblemConfig& conf)
     cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
                   cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
 
-#endif
-#else
-    auto V__ = std::unique_ptr<T[]>(new T[m_ * (nev + nex)]);
-    auto Lambda__ = std::unique_ptr<Base<T>[]>(new Base<T>[(nev + nex)]);
-    auto H__ = std::unique_ptr<T[]>(new T[ldh_ * n_]);
-
-    V = V__.get();
-    Lambda = Lambda__.get();
-    H = H__.get();
 #endif
 
 #if defined(USE_MPI)
@@ -653,12 +627,10 @@ int main(int argc, char* argv[])
     MPI_Finalize();
 #else
 
-#ifdef HAS_UM
     /*Free the memory of the matrix*/
     cudaFree(V_m);
     cudaFree(H_m);
     cudaFree(Lambda_m);
-#endif
     return 0;
 #endif
 }

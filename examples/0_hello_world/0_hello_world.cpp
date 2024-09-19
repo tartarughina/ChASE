@@ -15,8 +15,6 @@
 #include "ChASE-MPI/impl/chase_mpidla_mgpu.hpp"
 #include "algorithm/performance.hpp"
 
-#endif
-
 using T = std::complex<double>;
 using namespace chase;
 using namespace chase::mpi;

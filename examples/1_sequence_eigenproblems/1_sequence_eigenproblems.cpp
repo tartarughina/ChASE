@@ -16,7 +16,6 @@
 #include "algorithm/performance.hpp"
 #include <cuda.h>
 #include <cuda_runtime.h>
-#endif
 
 using T = std::complex<double>;
 using namespace chase;
