@@ -19,6 +19,11 @@
 #endif
 #include "algorithm/types.hpp"
 
+namespace chase
+{
+namespace mpi
+{
+
 template <class T>
 class UnifiedMem
 {
