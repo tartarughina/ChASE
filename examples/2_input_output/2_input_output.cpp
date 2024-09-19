@@ -23,8 +23,6 @@
 #endif
 #include <cuda.h>
 #include <cuda_runtime.h>
-#endif
-#endif
 
 using namespace chase;
 using namespace chase::mpi;
