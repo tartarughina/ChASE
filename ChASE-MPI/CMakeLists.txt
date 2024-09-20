@@ -6,7 +6,7 @@ cmake_minimum_required( VERSION 3.8 )
 option(ENABLE_CUDA_AWARE_MPI "Enable CUDA aware MPI for collective communications" ON)
 option(ENABLE_NCCL "Enable Nvidia NCCL for collective communications" ON)
 option(ENABLE_MPI_IO "Enable MPI IO to read Hamiltonian matrix from local" ON)
-
+option(ENABLE_UM "Enable Unified Memory for CUDA" OFF)
 option(ENABLE_TUNING "Enable UM Tuning" OFF)
 
 add_library( chase_seq INTERFACE )
@@ -178,7 +178,11 @@ if(CMAKE_CUDA_COMPILER)
     target_compile_definitions( chase_cuda INTERFACE
    "-DHAS_CUDA"
         )
-
+    if(ENABLE_UM)
+        target_compile_definitions( chase_cuda INTERFACE
+            "-DHAS_UM"
+          )
+    endif()
     if(ENABLE_TUNING)
         target_compile_definitions( chase_cuda INTERFACE
             "-DHAS_TUNING"
@@ -273,3 +277,4 @@ install(EXPORT chase-mpi
   EXPORT_LINK_INTERFACE_LIBRARIES
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
   )
+
