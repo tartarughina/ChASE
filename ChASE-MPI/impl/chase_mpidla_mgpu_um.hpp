@@ -322,8 +322,7 @@ public:
         cusolverDnCreate(&cusolverH_);
         cublasSetPointerMode(cublasH2_, CUBLAS_POINTER_MODE_DEVICE);
         cuda_exec(cudaMallocManaged((void**)&devInfo_, sizeof(int)));
-        /* Initialized so that the memory is not just allocated */
-        // *devInfo_ = 0;
+
         int lwork_heevd = 0;
         cusolver_status_ = cusolverDnTheevd_bufferSize(
             cusolverH_, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER,
@@ -349,19 +348,10 @@ public:
         cuda_exec(cudaMallocManaged((void**)&d_work_, sizeof(T) * lwork_));
 
         // for shifting matrix
-        // Calculate the maximum possible size for the vectors
-        std::size_t max_size = mblocks_ *
-                               nblocks_ * // maximum potential elements
-                               *c_lens_ * *r_lens_;
-
-        cudaMallocManaged((void**)&d_off_m_, max_size * sizeof(std::size_t));
-        cudaMallocManaged((void**)&d_off_n_, max_size * sizeof(std::size_t));
-
-        std::vector<std::size_t> off_m(d_off_m_, d_off_m_ + max_size);
-        std::vector<std::size_t> off_n(d_off_n_, d_off_n_ + max_size);
-
-        std::size_t diag_off_size_ = 0;
-
+        // It would have been ideal to use the managed memory from the start but
+        // due to the push back it is better to stick to it and use the managed
+        // memory aftwerwards
+        std::vector<std::size_t> off_m, off_n;
         for (std::size_t j = 0; j < nblocks_; j++)
         {
             for (std::size_t i = 0; i < mblocks_; i++)
@@ -372,22 +362,24 @@ public:
                     {
                         if (q + c_offs_[j] == p + r_offs_[i])
                         {
-                            off_m[diag_off_size_] = p + r_offs_l_[i];
-                            off_n[diag_off_size_] = q + c_offs_l_[j];
-                            diag_off_size_++;
+                            off_m.push_back(p + r_offs_l_[i]);
+                            off_n.push_back(q + c_offs_l_[j]);
                         }
                     }
                 }
             }
         }
+        diag_off_size_ = off_m.size();
 
-        // Resize the vectors to the actual size
-        off_m.resize(diag_off_size_);
-        off_n.resize(diag_off_size_);
+        cudaMallocManaged((void**)&(d_off_m_),
+                          diag_off_size_ * sizeof(std::size_t));
+        cudaMallocManaged((void**)&(d_off_n_),
+                          diag_off_size_ * sizeof(std::size_t));
 
-        // Update the device pointers to the actual sizes used
-        d_off_m_ = off_m.data();
-        d_off_n_ = off_n.data();
+        std::memcpy(d_off_m_, off_m.data(),
+                    diag_off_size_ * sizeof(std::size_t));
+        std::memcpy(d_off_n_, off_n.data(),
+                    diag_off_size_ * sizeof(std::size_t));
 
         cuda_exec(cudaStreamCreate(&stream1_));
         cuda_exec(cudaStreamCreate(&stream2_));
