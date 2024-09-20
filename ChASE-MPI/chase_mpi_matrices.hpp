@@ -139,26 +139,27 @@ class UnifiedMem
 public:
     UnifiedMem() : size_(0), ptr_(nullptr), allocated_(false) {}
 
-    UnifiedMem(std::size_t size) : size_(size), allocated_(true), type_("GPU")
+    UnifiedMem(std::size_t size) : size_(size), allocated_(true), type_("CPU")
     {
         int dev;
         cudaGetDevice(&dev);
         device_ = dev;
 
         cudaMallocManaged(&ptr_, size_ * sizeof(T));
-
+#if defined(HAS_TUNING)
         cudaMemAdvise(ptr_, size_ * sizeof(T),
                       cudaMemAdviseSetPreferredLocation, device_);
         cudaMemAdvise(ptr_, size_ * sizeof(T), cudaMemAdviseSetAccessedBy,
                       device_);
         cudaMemAdvise(ptr_, size_ * sizeof(T), cudaMemAdviseSetAccessedBy,
                       cudaCpuDeviceId);
+#endif
 
         cudaMemset(ptr_, 0, size_ * sizeof(T));
     }
 
     UnifiedMem(T* ptr, std::size_t size)
-        : size_(size), ptr_(ptr), allocated_(false), type_("GPU")
+        : size_(size), ptr_(ptr), allocated_(false), type_("CPU")
     {
     }
 
@@ -206,7 +207,6 @@ public:
             case 1:
             case 2:
             case 3: // Unified Memory
-                printf("Unified Memory matrix creation\n");
                 Device_ = std::make_shared<UnifiedMem<T>>(m * n);
                 Host_ = Device_;
                 isHostAlloc_ = false;
@@ -214,21 +214,18 @@ public:
                 break;
 #else
             case 0: // CPU
-                printf("CPU matrix creation\n");
                 Host_ = std::make_shared<CpuMem<T>>(m * n);
                 isHostAlloc_ = true;
                 isDeviceAlloc_ = false;
                 break;
 #if defined(HAS_CUDA)
             case 1: // Traditional GPU
-                printf("Traditional GPU matrix creation\n");
                 Host_ = std::make_shared<CpuMem<T>>(m * n, true);
                 Device_ = std::make_shared<GpuMem<T>>(m * n);
                 isHostAlloc_ = true;
                 isDeviceAlloc_ = true;
                 break;
             case 2: // CUDA-Aware
-                printf("CUDA-Aware matrix creation\n");
                 Device_ = std::make_shared<GpuMem<T>>(m * n);
                 isHostAlloc_ = false;
                 isDeviceAlloc_ = true;
@@ -248,7 +245,6 @@ public:
             case 1:
             case 2:
             case 3:
-                printf("Unified Memory matrix creation\n");
                 Host_ = std::make_shared<UnifiedMem<T>>(ptr, ld * n);
                 Device_ = Host_;
                 isHostAlloc_ = true;
@@ -256,21 +252,18 @@ public:
                 break;
 #else
             case 0:
-                printf("CPU matrix creation\n");
                 Host_ = std::make_shared<CpuMem<T>>(ptr, ld * n);
                 isHostAlloc_ = true;
                 isDeviceAlloc_ = false;
                 break;
 #if defined(HAS_CUDA)
             case 1:
-                printf("Traditional GPU matrix creation\n");
                 Host_ = std::make_shared<CpuMem<T>>(ptr, ld * n);
                 Device_ = std::make_shared<GpuMem<T>>(m * n);
                 isHostAlloc_ = true;
                 isDeviceAlloc_ = true;
                 break;
             case 2:
-                printf("CUDA-Aware matrix creation\n");
                 Host_ = std::make_shared<CpuMem<T>>(ptr, ld * n);
                 Device_ = std::make_shared<GpuMem<T>>(m * n);
                 isHostAlloc_ = true;
