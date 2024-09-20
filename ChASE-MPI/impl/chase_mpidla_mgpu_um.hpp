@@ -265,17 +265,9 @@ public:
     //!  allocates the required buffers in ChASE-MPI.
     ChaseMpiDLAMultiGPU(ChaseMpiProperties<T>* matrix_properties, T* H,
                         std::size_t ldh, T* V1, Base<T>* ritzv)
-#if defined(HAS_UM)
         : matrices_(std::move(
               matrix_properties->create_matrices(3, H, ldh, V1, ritzv)))
 
-#elif defined(CUDA_AWARE)
-        : matrices_(std::move(
-              matrix_properties->create_matrices(2, H, ldh, V1, ritzv)))
-#else
-        : matrices_(std::move(
-              matrix_properties->create_matrices(1, H, ldh, V1, ritzv)))
-#endif
     // Create the matrices object providing the mode, 2 for CUDA-AWARE and 1 for
     // HAS_GPU
     {

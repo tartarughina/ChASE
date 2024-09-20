@@ -164,12 +164,15 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count,
 #if defined(HAS_TUNING)
         case CPY_D2D:
             cudaMemPrefetchAsync(src, count, device_id);
+            cudaDeviceSynchronize();
             break;
         case CPY_D2H:
             cudaMemPrefetchAsync(src, count, cudaCpuDeviceId);
+            cudaDeviceSynchronize();
             break;
         case CPY_H2D:
             cudaMemPrefetchAsync(src, count, device_id);
+            cudaDeviceSynchronize();
             break;
 #else
         case CPY_D2D:
@@ -180,7 +183,7 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count,
 #else
         case CPY_D2D:
             cudaMemcpy(dst, src, count, cudaMemcpyDeviceToDevice);
-            // cudaDeviceSynchronize();
+            cudaDeviceSynchronize();
             break;
         case CPY_D2H:
             cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost);

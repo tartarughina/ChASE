@@ -326,6 +326,7 @@ public:
 #if defined(HAS_UM) && defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              Device_.get()->dev_id(), 0);
+        cudaDeviceSynchronize();
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing
 #else
@@ -341,6 +342,7 @@ public:
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), Device_.get()->dev_id(),
                              0);
+        cudaDeviceSynchronize();
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing since UM is enabled but no tuning is required
 #else
@@ -357,6 +359,7 @@ public:
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              cudaCpuDeviceId, 0);
+        cudaDeviceSynchronize();
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing since UM is enabled but no tuning is required
 #else
@@ -372,6 +375,7 @@ public:
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), cudaCpuDeviceId, 0);
+        cudaDeviceSynchronize();
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing since UM is enabled but no tuning is required
 #else
@@ -390,6 +394,7 @@ public:
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), cudaCpuDeviceId, 0);
+        cudaDeviceSynchronize();
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing since UM is enabled but no tuning is required
 #else
@@ -408,6 +413,7 @@ public:
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              cudaCpuDeviceId, 0);
+        cudaDeviceSynchronize();
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing since UM is enabled but no tuning is required
 #else
@@ -445,6 +451,7 @@ public:
 #if defined(HAS_UM) && defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              Device_.get()->dev_id(), 0);
+        cudaDeviceSynchronize();
 #elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing
 #else
@@ -538,18 +545,12 @@ public:
             onlyGPU = 3;
         }
 #endif
-        printf("Creating H from H\n");
         H___ = std::make_unique<Matrix<T>>(isGPU, N, N, H, ldh);
-        printf("Creating C from V1\n");
         C___ = std::make_unique<Matrix<T>>(isGPU, N, max_block, V1, N);
-        printf("Creating B\n");
         B___ = std::make_unique<Matrix<T>>(onlyGPU, N, max_block);
-        printf("Creating A\n");
         A___ = std::make_unique<Matrix<T>>(onlyGPU, max_block, max_block);
-        printf("Creating Ritzv from ritzv\n");
         Ritzv___ = std::make_unique<Matrix<Base<T>>>(isGPU, 1, max_block, ritzv,
                                                      max_block);
-        printf("Creating resid\n");
         Resid___ = std::make_unique<Matrix<Base<T>>>(isGPU, 1, max_block);
     }
 
@@ -614,24 +615,15 @@ public:
             isCUDA_Aware = 3;
         }
 #endif
-        printf("Creating H from H\n");
         H___ = std::make_unique<Matrix<T>>(isGPU, m, n, H, ldh);
-        printf("Creating C from V1\n");
         C___ = std::make_unique<Matrix<T>>(isCUDA_Aware, m, max_block, V1, m);
-        printf("Creating C2\n");
         C2___ = std::make_unique<Matrix<T>>(isCUDA_Aware, m, max_block);
-        printf("Creating B\n");
         B___ = std::make_unique<Matrix<T>>(isCUDA_Aware, n, max_block);
-        printf("Creating B2\n");
         B2___ = std::make_unique<Matrix<T>>(isCUDA_Aware, n, max_block);
-        printf("Creating A\n");
         A___ = std::make_unique<Matrix<T>>(isCUDA_Aware, max_block, max_block);
-        printf("Creating Ritzv from ritzv\n");
         Ritzv___ = std::make_unique<Matrix<Base<T>>>(isGPU, 1, max_block, ritzv,
                                                      max_block);
-        printf("Creating resid\n");
         Resid___ = std::make_unique<Matrix<Base<T>>>(isGPU, 1, max_block);
-        printf("Creating vv\n");
         vv___ = std::make_unique<Matrix<T>>(isGPU, m, 1);
     }
 
