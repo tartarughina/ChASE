@@ -668,7 +668,6 @@ public:
         {
             /* Ensure that the value for devInfo is available on the CPU */
             cudaDeviceSynchronize();
-            printf("Info inside potrf: %d\n", *devInfo_);
             return *devInfo_;
         }
 

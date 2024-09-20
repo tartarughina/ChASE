@@ -144,15 +144,7 @@ void Bcast(int backend, T* buff, int count, MPI_Datatype datatype, int root,
     }
 }
 
-// For Unified Memory I could do something like:
-// no tuning: simply do nothing, there's no need to move memory
-// tuning: prefetch memory based on the mode
-// the only thing is that DeviceToDevice is a bit complicated
-// I mean, it actually do something copying memory from a device to another...
-// Changing that with a standard memcpy is possible but dumb...
-// Dunno for the moment i could simply do nothing and leave it
-void Memcpy(int mode, void* dst, const void* src, std::size_t count,
-            int device_id = 0)
+void Memcpy(int mode, void* dst, const void* src, std::size_t count)
 {
     switch (mode)
     {
@@ -160,30 +152,9 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count,
             std::memcpy(dst, src, count);
             break;
 #if defined(CUDA_AWARE)
-#if defined(HAS_UM)
-#if defined(HAS_TUNING)
-        case CPY_D2D:
-            cudaMemPrefetchAsync(src, count, device_id);
-            cudaDeviceSynchronize();
-            break;
-        case CPY_D2H:
-            cudaMemPrefetchAsync(src, count, cudaCpuDeviceId);
-            cudaDeviceSynchronize();
-            break;
-        case CPY_H2D:
-            cudaMemPrefetchAsync(src, count, device_id);
-            cudaDeviceSynchronize();
-            break;
-#else
-        case CPY_D2D:
-        case CPY_D2H:
-        case CPY_H2D:
-            break;
-#endif
-#else
         case CPY_D2D:
             cudaMemcpy(dst, src, count, cudaMemcpyDeviceToDevice);
-            cudaDeviceSynchronize();
+            // cudaDeviceSynchronize();
             break;
         case CPY_D2H:
             cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost);
@@ -191,7 +162,6 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count,
         case CPY_H2D:
             cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice);
             break;
-#endif
 #endif
     }
 }

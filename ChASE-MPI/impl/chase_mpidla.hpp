@@ -1427,7 +1427,9 @@ public:
         v_1 = new Matrix<T>(matrix_mode, m_, numvec);
         v_2 = new Matrix<T>(matrix_mode, m_, numvec);
         v_w = new Matrix<T>(matrix_mode, n_, numvec);
-
+        // Dear Riccardo... the problem to me seems very easy and straight
+        // forward... you are providing the function un initialized memory and
+        // you are expecting to obtain a result out of it... how sweet
         // Memcpy(memcpy_mode[1], v_1->ptr(), C, m_ * numvec * sizeof(T));
         Memcpy(memcpy_mode[1], v_1->ptr(), C, m_ * numvec * sizeof(T));
 
