@@ -82,7 +82,6 @@ int main(int argc, char** argv)
     auto ldh_ = props->get_ldh();
 
 #ifdef HAS_UM
-    printf("UM is enabled\n");
     T *V, *H;
     Base<T>* Lambda;
     cudaMallocManaged((void**)&V, m_ * (nev + nex) * sizeof(T));
