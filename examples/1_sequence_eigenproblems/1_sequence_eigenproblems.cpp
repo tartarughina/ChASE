@@ -82,16 +82,11 @@ int main(int argc, char** argv)
     auto ldh_ = props->get_ldh();
 
 #ifdef HAS_UM
-    T *V_m, *H_m;
-    Base<T>* Lambda_m;
-    cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
-    cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
-    cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
-
-    auto V = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
-    auto Lambda =
-        std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
-    auto H = std::vector<T>(H_m, H_m + ldh_ * n_);
+    T *V, *H;
+    Base<T>* Lambda;
+    cudaMallocManaged((void**)&V, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H, ldh_ * n_ * sizeof(T));
 
 #ifdef HAS_TUNING
     int device;
@@ -120,13 +115,13 @@ int main(int argc, char** argv)
 
 #endif
 #else
-    auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
-    auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
-    auto H = std::vector<T>(ldh_ * n_);            // eigevectors
+    T* V = malloc(m_ * (nev + nex) * sizeof(T));           // eigevectors
+    Base<T>* Lambda = malloc(nev + nex * sizeof(Base<T>)); // eigenvalues
+    T* H = malloc(ldh_ * n_ * sizeof(T));                  // eigevectors
 #endif
 
     // Creation of ChaseMPIDLA and ChaseMPIDLA_MGPU objects
-    CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
+    CHASE single(props, H, ldh_, V, Lambda);
 
     /*Setup configure for ChASE*/
     auto& config = single.GetConfig();
@@ -276,5 +271,10 @@ int main(int argc, char** argv)
     cudaFree(V_m);
     cudaFree(H_m);
     cudaFree(Lambda_m);
+#else
+    /*Free the memory of the matrix*/
+    delete[] V;
+    delete[] H;
+    delete[] Lambda;
 #endif
 }
