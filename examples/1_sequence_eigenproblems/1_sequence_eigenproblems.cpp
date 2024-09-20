@@ -115,9 +115,9 @@ int main(int argc, char** argv)
 
 #endif
 #else
-    T* V = malloc(m_ * (nev + nex) * sizeof(T));           // eigevectors
-    Base<T>* Lambda = malloc(nev + nex * sizeof(Base<T>)); // eigenvalues
-    T* H = malloc(ldh_ * n_ * sizeof(T));                  // eigevectors
+    T* V = new T[m_ * (nev + nex)];           // Eigenvectors
+    Base<T>* Lambda = new Base<T>[nev + nex]; // Eigenvalues
+    T* H = new T[ldh_ * n_];                  // Eigenvectors
 #endif
 
     // Creation of ChaseMPIDLA and ChaseMPIDLA_MGPU objects
@@ -268,9 +268,9 @@ int main(int argc, char** argv)
 
 #ifdef HAS_UM
     /*Free the memory of the matrix*/
-    cudaFree(V_m);
-    cudaFree(H_m);
-    cudaFree(Lambda_m);
+    cudaFree(V);
+    cudaFree(H);
+    cudaFree(Lambda);
 #else
     /*Free the memory of the matrix*/
     delete[] V;
