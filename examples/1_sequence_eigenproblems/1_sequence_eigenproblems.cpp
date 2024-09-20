@@ -96,6 +96,7 @@ int main(int argc, char** argv)
 #ifdef HAS_TUNING
     int device;
     cudaGetDevice(&device);
+    printf("Device %d selected from rank %d", rank, device);
     cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T),
                   cudaMemAdviseSetPreferredLocation, device);
     cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
