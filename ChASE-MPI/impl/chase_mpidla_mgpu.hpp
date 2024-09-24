@@ -273,7 +273,6 @@ public:
               matrix_properties->create_matrices(1, H, ldh, V1, ritzv)))
 #endif
     {
-        printf("ChaseMpiDLAMultiGPU: Init\n");
 #ifdef USE_NSIGHT
         nvtxRangePushA("ChaseMpiDLAMultiGPU: Init");
 #endif
