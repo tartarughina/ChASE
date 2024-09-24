@@ -448,6 +448,13 @@ int do_chase(ChASE_DriverProblemConfig& conf)
         }
     }
 
+#ifdef HAS_UM
+    /*Free the memory of the matrix*/
+    cudaFree(V);
+    cudaFree(H);
+    cudaFree(Lambda);
+#endif
+
     return 0;
 }
 
@@ -653,12 +660,6 @@ int main(int argc, char* argv[])
     MPI_Finalize();
 #else
 
-#ifdef HAS_UM
-    /*Free the memory of the matrix*/
-    cudaFree(V_m);
-    cudaFree(H_m);
-    cudaFree(Lambda_m);
-#endif
     return 0;
 #endif
 }
