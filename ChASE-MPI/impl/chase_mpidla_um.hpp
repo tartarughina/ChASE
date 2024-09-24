@@ -323,9 +323,10 @@ public:
 
         if (cuda_aware_)
         {
-            memcpy_mode[0] = CPY_D2D;
-            memcpy_mode[1] = CPY_D2H;
-            memcpy_mode[2] = CPY_H2D;
+            // UM uses std:memcpy to copy data between different matrices
+            memcpy_mode[0] = CPY_H2H;
+            memcpy_mode[1] = CPY_H2H;
+            memcpy_mode[2] = CPY_H2H;
 #if defined(HAS_NCCL)
             allreduce_backend = NCCL_BACKEND;
             bcast_backend = NCCL_BACKEND;

@@ -149,7 +149,19 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count)
     switch (mode)
     {
         case CPY_H2H:
+#if defined(HAS_TUNING)
+            // Prefetch the data to the CPU
+            cudaMemPrefetchAsync(src, count, 0, -1);
+            cudaDeviceSynchronize();
+#endif
             std::memcpy(dst, src, count);
+#if defined(HAS_TUNING)
+            // Prefetch the data to the GPU
+            int dev;
+            cudaGetDevice(&dev);
+            cudaMemPrefetchAsync(src, count, 0, dev);
+            cudaDeviceSynchronize();
+#endif
             break;
 #if defined(CUDA_AWARE)
         case CPY_D2D:
