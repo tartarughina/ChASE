@@ -511,19 +511,6 @@ public:
         int tryrac = 0;
         std::vector<int> isuppz(2 * M);
         std::vector<Base<T>> ritzv(M);
-        printf("Here comes the issues\n");
-        printf("M: %ld upperb: %f\n", M, *upperb);
-        printf("d:\n");
-
-        for (auto x : d)
-        {
-            printf("%f ", x);
-        }
-        printf("\ne\n");
-        for (auto x : e)
-        {
-            printf("%f ", x);
-        }
 
         t_stemr<Base<T>>(LAPACK_COL_MAJOR, 'N', 'A', M, d.data(), e.data(), ul,
                          ll, vl, vu, &notneeded_m, ritzv.data(), NULL, M, M,

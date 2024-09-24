@@ -1182,11 +1182,8 @@ std::size_t t_stemr(int matrix_layout, char jobz, char range, std::size_t n,
     FC_GLOBAL(dstemr, DSTEMR)
     (&jobz, &range, &n_, d, e, &vl, &vu, &il_, &iu_, m, w, z, &ldz_, &nzc_,
      isuppz, tryrac, work, &lwork, iwork, &liwork, &info);
-    if (info != 0) {
-    printf("Workspace query failed with info = %d\n", info);
-    return info;  // Or handle the error appropriately.
-}
-    // assert(info == 0);
+
+    assert(info == 0);
     return info;
 }
 

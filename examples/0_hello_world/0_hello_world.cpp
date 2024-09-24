@@ -36,9 +36,6 @@ typedef ChaseMpi<ChaseMpiDLABlaslapack, T> CHASE;
 #endif
 int main(int argc, char** argv)
 {
-#if defined(HAS_UM)
-    printf("Check HAS_UM\n");
-#endif
     MPI_Init(&argc, &argv);
     int rank = 0, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -103,18 +100,15 @@ int main(int argc, char** argv)
     auto ldh_ = props->get_ldh();
     printf("Retrieval of matrix prop complete\n");
 #ifdef HAS_UM
-    printf("Reached mallocManaged\n");
     T *V_m, *H_m;
     Base<T>* Lambda_m;
     cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
     cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
     cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
-    printf("Completed mallocManaged\n");
     auto V = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
     auto Lambda =
         std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
     auto H = std::vector<T>(H_m, H_m + ldh_ * n_);
-    printf("Associated cuda pointer to vector\n");
 #ifdef HAS_TUNING
     int device;
     cudaGetDevice(&device);
@@ -139,19 +133,13 @@ int main(int argc, char** argv)
     cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
                   cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
 
-    printf("Successfully advised memory\n");
-
 #endif
 #else
-    printf("Reached standard definition\n");
     auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
     auto H = std::vector<T>(ldh_ * n_);            // eigevectors
-    printf("Completed standard vector allocation\n");
 #endif
-    printf("Reached single definition\n");
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
-    printf("Completed single definition\n");
     std::vector<T> Clement(N * N, T(0.0));
 
     /*Generate Clement matrix*/
@@ -163,7 +151,7 @@ int main(int argc, char** argv)
         if (i != N - 1)
             Clement[i + N * (i + 1)] = std::sqrt(i * (N + 1 - i));
     }
-    printf("Completed Clement matrix generation\n");
+
     if (rank == 0)
     {
         std::cout << "Starting Problem #1"
@@ -235,12 +223,12 @@ int main(int argc, char** argv)
 #endif
                   << '\n'
                   << config;
-    printf("Reached performance decorator\n");
+
     /*Performance Decorator to meaure the performance of kernels of ChASE*/
     PerformanceDecoratorChase<T> performanceDecorator(&single);
     /*Solve the eigenproblem*/
     chase::Solve(&performanceDecorator);
-    printf("Completed solving the eigenproblem\n");
+
     /*Output*/
     if (rank == 0)
     {
