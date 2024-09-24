@@ -42,7 +42,23 @@ using namespace popl;
 std::size_t GetFileSize(std::string path_in)
 {
     std::ifstream file(path_in, std::ios::binary | std::ios::ate);
-    return file.tellg();
+    if (!file.is_open())
+    {
+        std::cerr << "Error: Could not open file " << path_in << std::endl;
+        return 0; // Or std::size_t(-1) if you want to signal an error
+                  // differently
+    }
+
+    std::size_t size = file.tellg();
+    if (size == static_cast<std::size_t>(-1))
+    {
+        std::cerr << "Error: Could not determine file size for " << path_in
+                  << std::endl;
+        return 0; // Or std::size_t(-1) if you want to signal an error
+                  // differently
+    }
+
+    return size;
 }
 
 struct ChASE_DriverProblemConfig
