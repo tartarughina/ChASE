@@ -92,25 +92,25 @@ int main(int argc, char** argv)
     int device;
     cudaGetDevice(&device);
     printf("Device %d selected from rank %d", rank, device);
-    cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T),
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T),
                   cudaMemAdviseSetPreferredLocation, device);
-    cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
                   device);
-    cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
                   cudaCpuDeviceId);
 
-    cudaMemAdvise(H_m, m_ * ldh_ * n_ * sizeof(T),
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T),
                   cudaMemAdviseSetPreferredLocation, device);
-    cudaMemAdvise(H_m, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
                   device);
-    cudaMemAdvise(H_m, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
                   cudaCpuDeviceId);
 
-    cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
                   cudaMemAdviseSetPreferredLocation, device);
-    cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
                   cudaMemAdviseSetAccessedBy, device);
-    cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
                   cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
 
 #endif
