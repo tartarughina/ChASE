@@ -352,8 +352,7 @@ public:
             if (cuda_aware_)
             {
                 // Cover cuda-aware and unified memory
-                buff__ = std::make_unique<Matrix<T>>(matrices_->get_Mode(),
-                                                     max_c_len, nex_ + nev_);
+                buff__ = std::make_unique<Matrix<T>>(3, max_c_len, nex_ + nev_);
             }
             else
             {

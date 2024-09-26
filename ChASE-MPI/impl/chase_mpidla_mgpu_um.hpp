@@ -269,9 +269,6 @@ public:
                         std::size_t ldh, T* V1, Base<T>* ritzv)
         : matrices_(std::move(
               matrix_properties->create_matrices(3, H, ldh, V1, ritzv)))
-
-    // Create the matrices object providing the mode, 2 for CUDA-AWARE and 1 for
-    // HAS_GPU
     {
 #ifdef USE_NSIGHT
         nvtxRangePushA("ChaseMpiDLAMultiGPUUM: Init");
@@ -454,7 +451,9 @@ public:
         chase_rand_normal(seed, states_, C__.device(), m_ * (nev_ + nex_),
                           (cudaStream_t)0);
 
+#if !defined(CUDA_AWARE)
         C__.D2H(m_, nev_ + nex_);
+#endif
     }
 
     //! - This function set initially the operation for apply() in filter
@@ -463,10 +462,12 @@ public:
     {
         next_ = NextOp::bAc;
 
+#if !defined(CUDA_AWARE)
         if (locked > 0)
         {
             C__.H2D(m_, block, locked);
         }
+#endif
     }
 
     //! - This function performs the local computation of `GEMM` for
@@ -484,7 +485,9 @@ public:
                 beta = Zero;
             }
 
+#if !defined(CUDA_AWARE)
             C__.H2D(m_, block, offset + locked);
+#endif
 
             cublas_status_ =
                 cublasTgemm(cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, n_, block, m_,
@@ -493,7 +496,9 @@ public:
                             B__.device() + locked * n_ + offset * n_, n_);
             assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
+#if !defined(CUDA_AWARE)
             B__.D2H(n_, block, locked + offset);
+#endif
             next_ = NextOp::cAb;
         }
         else
@@ -502,7 +507,9 @@ public:
             {
                 beta = Zero;
             }
+#if !defined(CUDA_AWARE)
             B__.H2D(n_, block, locked + offset);
+#endif
 
             cublas_status_ =
                 cublasTgemm(cublasH_, CUBLAS_OP_N, CUBLAS_OP_N, m_, block, n_,
@@ -511,7 +518,9 @@ public:
                             C__.device() + locked * m_ + offset * m_, m_);
             assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
+#if !defined(CUDA_AWARE)
             C__.D2H(m_, block, offset + locked);
+#endif
 
             next_ = NextOp::bAc;
         }
@@ -538,10 +547,12 @@ public:
         T alpha = T(1.0);
         T beta = T(0.0);
 
+#if !defined(CUDA_AWARE)
         if (!isCcopied)
         {
             C__.H2D(m_, block, locked);
         }
+#endif
 
         cublas_status_ = cublasTgemm(cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, n_,
                                      block, m_, &alpha, H__.device(),
@@ -549,7 +560,9 @@ public:
                                      &beta, B__.device() + locked * n_, n_);
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
+#if !defined(CUDA_AWARE)
         B__.D2H(n_, block, locked);
+#endif
     }
 
     //! - All required operations for this function has been done in for
@@ -588,17 +601,14 @@ public:
 
     int get_nprocs() const override { return matrix_properties_->get_nprocs(); }
     void Start() override {}
-    void End() override { C__.D2H(m_, nev_); }
-    Base<T>* get_Resids() override
+    void End() override
     {
-        Resid__.D2H();
-        return Resid__.host();
+#if defined(CUDA_AWARE)
+        C__.D2H(m_, nev_);
+#endif
     }
-    Base<T>* get_Ritzv() override
-    {
-        Ritzv__.D2H();
-        return Ritzv__.host();
-    }
+    Base<T>* get_Resids() override { return Resid__.host(); }
+    Base<T>* get_Ritzv() override { return Ritzv__.host(); }
 
     //! It is an interface to BLAS `?axpy`.
     void axpy(std::size_t N, T* alpha, T* x, std::size_t incx, T* y,
@@ -637,8 +647,10 @@ public:
         T One = T(1.0);
         T Zero = T(0.0);
 
+#if !defined(CUDA_AWARE)
         B__.H2D(n_, block, locked);
         B2__.H2D(n_, block, locked);
+#endif
 
         cublas_status_ = cublasTgemm(
             cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, block, block, n_, &One,
@@ -646,7 +658,9 @@ public:
             &Zero, A__.device(), nev_ + nex_);
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
+#if !defined(CUDA_AWARE)
         A__.D2H(block, block);
+#endif
     }
     //! It is an interface to cuBLAS `cublasXsy(he)rk`.
     void syherk(char uplo, char trans, std::size_t n, std::size_t k, T* alpha,
@@ -673,14 +687,18 @@ public:
                                        nev_ + nex_, m_, &One, C__.device(), m_,
                                        &Zero, A__.device(), nev_ + nex_);
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
+#if !defined(CUDA_AWARE)
         A__.D2H(nev_ + nex_, nev_ + nex_);
+#endif
     }
     //! It is an interface to cuSOLVER `cusolverXpotrf`.
     int potrf(char uplo, std::size_t n, T* a, std::size_t lda,
               bool isinfo = true) override
     {
 
+#if !defined(CUDA_AWARE)
         A__.H2D(nev_ + nex_, nev_ + nex_);
+#endif
 
 #ifdef USE_NSIGHT
         nvtxRangePushA("cusolverDnTpotrf");
@@ -715,16 +733,18 @@ public:
                         alpha, A__.device(), nev_ + nex_, C__.device(), m_);
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
+#if !defined(CUDA_AWARE)
         if (!first)
         {
             C__.D2H(m_, nev_ + nex_);
         }
+#endif
     }
     //! - This function performs the local computation of residuals for
     //! ChaseMpiDLA::Resd()
     //! - It is implemented based on `BLAS`'s `?axpy` and `?nrm2`.
-    //! - This function computes only the residuals of local part of vectors on
-    //! each MPI proc.
+    //! - This function computes only the residuals of local part of vectors
+    //! on each MPI proc.
     //! - The final results are obtained in ChaseMpiDLA::Resd() with an
     //! MPI_Allreduce operation
     //!      within the row communicator.
@@ -738,7 +758,8 @@ public:
 
         // Resid__.D2H(locked, unconverged);
     }
-    //! - This function performs the local computation for ChaseMpiDLA::heevd()
+    //! - This function performs the local computation for
+    //! ChaseMpiDLA::heevd()
     //! - It is implemented based on `cuBLAS`'s `xgemm` and cuSOLVER's
     //! `cusolverXsy(he)evd`.
     void heevd(int matrix_layout, char jobz, char uplo, std::size_t n, T* a,
@@ -748,7 +769,9 @@ public:
         T Zero = T(0.0);
         std::size_t locked = nev_ + nex_ - n;
 
+#if !defined(CUDA_AWARE)
         A__.H2D(n, n);
+#endif
 
 #ifdef USE_NSIGHT
         nvtxRangePushA("cusolverDnTheevd");
@@ -766,7 +789,9 @@ public:
         // cuda_exec(cudaMemcpy(w, Ritzv__.device(), n * sizeof(Base<T>),
         //                      cudaMemcpyDeviceToHost));
 
+#if !defined(CUDA_AWARE)
         C2__.H2D(m_, n, locked);
+#endif
 
         cublas_status_ =
             cublasTgemm(cublasH_, CUBLAS_OP_N, CUBLAS_OP_N, m_, n, n, &One,
@@ -774,7 +799,9 @@ public:
                         nev_ + nex_, &Zero, C__.device() + locked * m_, m_);
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
+#if !defined(CUDA_AWARE)
         C__.D2H(m_, n, locked);
+#endif
     }
     //! - All required operations for this function has been done in for
     //! ChaseMpiDLA::hhQR().
@@ -861,6 +888,7 @@ public:
                                std::size_t ld)
     {
         absTrace_gpu(A, d_sum_, n, ld, (cudaStream_t)0);
+        cuda_exec(cudaDeviceSynchronize());
         *sum = *d_sum_;
     }
 
@@ -873,8 +901,9 @@ public:
         #if defined(CUDA_AWARE)
                 for(auto i = 0; i < count; i++ )
                 {
-                    cublas_status_ = cublasTnrm2(cublasH_, n, x->device() + i *
-        n, incx, &nrms[i]); assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
+                    cublas_status_ = cublasTnrm2(cublasH_, n, x->device() +
+        i * n, incx, &nrms[i]); assert(cublas_status_ ==
+        CUBLAS_STATUS_SUCCESS);
                 }
         #else
         */
@@ -891,8 +920,10 @@ public:
         #if defined(CUDA_AWARE)
                 for(auto i = 0; i < count; i++)
                 {
-                    cublas_status_ = cublasTscal(cublasH_, n, &a[i], x->device()
-        + i * x->d_ld(), incx); assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
+                    cublas_status_ = cublasTscal(cublasH_, n, &a[i],
+        x->device()
+        + i * x->d_ld(), incx); assert(cublas_status_ ==
+        CUBLAS_STATUS_SUCCESS);
                 }
         #else
         */
@@ -925,8 +956,8 @@ public:
         #if defined(CUDA_AWARE)
                 for(auto i = 0; i < count; i++)
                 {
-                    cublas_status_ = cublasTdot(cublasH_, n, x->device() + i *
-        x->d_ld(), incx, y->device() + i * y->d_ld(), incy, &products[i]);
+                    cublas_status_ = cublasTdot(cublasH_, n, x->device() + i
+        * x->d_ld(), incx, y->device() + i * y->d_ld(), incy, &products[i]);
                     assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
                 }
         #else
@@ -944,7 +975,8 @@ public:
         /*#if defined(CUDA_AWARE)
                 for(auto i = 0; i < count; i++)
                 {
-                    cublas_status_ = cublasTaxpy(cublasH_, N, alpha, x->device()
+                    cublas_status_ = cublasTaxpy(cublasH_, N, alpha,
+        x->device()
         + i * x->d_ld(), incx, y->device() + i * y->d_ld(), incy);
                     assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
                 }
@@ -965,14 +997,14 @@ private:
         bAc
     };
 
-    NextOp next_; //!< it is to manage the switch of operation from `V2=H*V1` to
-                  //!< `V1=H'*V2` in filter
+    NextOp next_;   //!< it is to manage the switch of operation from
+                    //!< `V2=H*V1` to `V1=H'*V2` in filter
     std::size_t N_; //!< global dimension of the symmetric/Hermtian matrix
 
     std::size_t n_; //!< number of columns of local matrix of the
                     //!< symmetric/Hermtian matrix
-    std::size_t
-        m_; //!< number of rows of local matrix of the symmetric/Hermtian matrix
+    std::size_t m_; //!< number of rows of local matrix of the
+                    //!< symmetric/Hermtian matrix
 
     std::size_t* off_;      //!< identical to ChaseMpiProperties::off_
     std::size_t* r_offs_;   //!< identical to ChaseMpiProperties::r_offs_
@@ -992,11 +1024,11 @@ private:
 
     // for shifting matrix H
     std::size_t*
-        d_off_m_; //!< the offset of the row of the first element each piece of
-                  //!< diagonal to be shifted within the local matrix `A`
-    std::size_t*
-        d_off_n_; //!< the offset of the column of the first element each piece
+        d_off_m_; //!< the offset of the row of the first element each piece
                   //!< of diagonal to be shifted within the local matrix `A`
+    std::size_t* d_off_n_; //!< the offset of the column of the first
+                           //!< element each piece of diagonal to be shifted
+                           //!< within the local matrix `A`
     std::size_t
         diag_off_size_; //!< number of elements to be shifted on each piece
 

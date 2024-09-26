@@ -462,7 +462,7 @@ public:
 #if defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              Device_.get()->dev_id(), 0);
-        cudaDeviceSynchronize();
+        // cudaDeviceSynchronize();
 #endif
         // Do nothing
 #else

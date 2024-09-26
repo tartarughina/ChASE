@@ -375,6 +375,27 @@ public:
         cudaMemcpy(d_off_n_, off_n.data(), diag_off_size_ * sizeof(std::size_t),
                    cudaMemcpyHostToDevice);
 
+        int dev;
+        cuda_exec(cudaGetDevice(&dev));
+        std::cout << "dev = " << dev << std::endl;
+        std::cout << "diag_off_size_ = " << diag_off_size_ << std::endl;
+        std::cout << d_off_m_ << " " << d_off_n_ << std::endl;
+        std::cout << d_off_n_ << " " << d_off_m_ << std::endl;
+
+        for (auto x : off_m)
+        {
+            std::cout << x << " ";
+        }
+
+        std::cout << std::endl;
+
+        for (auto x : off_n)
+        {
+            std::cout << x << std::endl;
+        }
+
+        std::cout << std::endl;
+
         cuda_exec(cudaStreamCreate(&stream1_));
         cuda_exec(cudaStreamCreate(&stream2_));
 
