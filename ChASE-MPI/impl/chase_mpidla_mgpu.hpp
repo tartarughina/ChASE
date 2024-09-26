@@ -375,7 +375,8 @@ public:
         cudaMemcpy(d_off_n_, off_n.data(), diag_off_size_ * sizeof(std::size_t),
                    cudaMemcpyHostToDevice);
 
-        int dev : cuda_exec(cudaGetDevice(&dev));
+        int dev;
+        cuda_exec(cudaGetDevice(&dev));
         std::cout << "dev = " << dev << std::endl;
         std::cout << "diag_off_size_ = " << diag_off_size_ << std::endl;
         std::cout << d_off_m_ << " " << d_off_n_ << std::endl;
