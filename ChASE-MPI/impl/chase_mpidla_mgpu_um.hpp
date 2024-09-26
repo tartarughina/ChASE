@@ -378,14 +378,14 @@ public:
         cuda_exec(cudaMallocManaged((void**)&d_off_n_,
                                     diag_off_size_ * sizeof(std::size_t)));
 
-        assert(d_off_m_ != nullptr);
-        assert(d_off_n_ != nullptr);
+        cout << "diag_off_size_ = " << diag_off_size_ << endl;
+        cout << d_off_m_ << " " << d_off_n_ << endl;
+        cout << d_off_n_ << " " << d_off_m_ << endl;
+        cout << off_m << endl;
+        cout << off_n << endl;
 
         std::copy(off_m.begin(), off_m.end(), d_off_m_);
         std::copy(off_n.begin(), off_n.end(), d_off_n_);
-
-        assert(d_off_m_ != nullptr);
-        assert(d_off_n_ != nullptr);
 
 #if defined(HAS_TUNING)
         cuda_exec(cudaMemPrefetchAsync(
