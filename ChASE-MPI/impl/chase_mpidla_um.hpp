@@ -1040,11 +1040,13 @@ public:
                   getMPI_Type<Base<T>>(), MPI_SUM, row_comm_, mpi_wrapper_);
         //  Base<T> *resid_h;
         // dla_->retrieveResid(&resid_h, locked, unconverged);
-        if (rsd != matrices_->Resid().ptr())
-        {
-            //	std::cout << "rsd != Resid().ptr()" << std::endl;
-            matrices_->Resid().sync2Ptr(1, unconverged, locked);
-        }
+        // if (rsd != matrices_->Resid().ptr())
+        // {
+        //     //	std::cout << "rsd != Resid().ptr()" << std::endl;
+        //     matrices_->Resid().sync2Ptr(1, unconverged, locked);
+        // }
+
+        matrices_->Resid().sync2Ptr(1, unconverged, locked);
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
@@ -1102,18 +1104,23 @@ public:
 #ifdef USE_NSIGHT
         nvtxRangePushA("pgeqrf+pgqr");
 #endif
-        if (C != matrices_->C().ptr())
-        {
-            matrices_->C().sync2Ptr();
-        }
+        // This code was done when the matrices were not unified memory or
+        // simply cudaAware, to fix the thing we need to sync the matrices, just
+        // for the cudeDeviceSynchronize()
+        // if (C != matrices_->C().ptr())
+        // {
+        //     matrices_->C().sync2Ptr();
+        // }
+        matrices_->C().sync2Ptr();
         t_pgeqrf(N_, nevex, matrices_->C().ptr(), one, one, desc1D_Nxnevx_,
                  tau.get());
         t_pgqr(N_, nevex, nevex, matrices_->C().ptr(), one, one, desc1D_Nxnevx_,
                tau.get());
-        if (C != matrices_->C().ptr())
-        {
-            matrices_->C().syncFromPtr();
-        }
+        // if (C != matrices_->C().ptr())
+        // {
+        //     matrices_->C().syncFromPtr();
+        // }
+        matrices_->C().syncFromPtr();
 #ifdef USE_NSIGHT
         nvtxRangePop();
         nvtxRangePushA("memcpy");
@@ -1129,10 +1136,11 @@ public:
             std::cout << "ScaLAPACK is not available, use LAPACK Householder "
                          "QR instead"
                       << std::endl;
-        if (C != matrices_->C().ptr())
-        {
-            matrices_->C().sync2Ptr();
-        }
+        // if (C != matrices_->C().ptr())
+        // {
+        //     matrices_->C().sync2Ptr();
+        // }
+        matrices_->C().sync2Ptr();
 
         if (!alloc_)
         {
@@ -1349,10 +1357,12 @@ public:
         auto nevex = nev_ + nex_;
 
         std::vector<T> V2(N_ * (nev_ + nex_));
-        if (C != matrices_->C().ptr())
-        {
-            matrices_->C().sync2Ptr();
-        }
+        // if (C != matrices_->C().ptr())
+        // {
+        //     matrices_->C().sync2Ptr();
+        // }
+
+        matrices_->C().sync2Ptr();
 
         this->collecRedundantVecs(matrices_->C().ptr(), V2.data(), 0,
                                   nev_ + nex_);
