@@ -383,6 +383,7 @@ public:
                     diag_off_size_ * sizeof(std::size_t));
 
 #if defined(HAS_TUNING)
+        printf("Device %d\n", A__.dev_id());
         cuda_exec(cudaMemPrefetchAsync(
             d_off_m_, diag_off_size_ * sizeof(std::size_t), A__.dev_id(), 0));
         cuda_exec(cudaMemPrefetchAsync(
