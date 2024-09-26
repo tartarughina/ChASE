@@ -378,32 +378,21 @@ public:
         cuda_exec(cudaMallocManaged((void**)&d_off_n_,
                                     diag_off_size_ * sizeof(std::size_t)));
 
-        std::cout << "diag_off_size_ = " << diag_off_size_ << std::endl;
-        std::cout << d_off_m_ << " " << d_off_n_ << std::endl;
-        std::cout << d_off_n_ << " " << d_off_m_ << std::endl;
-
-        for (auto x : off_m)
-        {
-            std::cout << x << " ";
-        }
-
-        std::cout << std::endl;
-
-        for (auto x : off_n)
-        {
-            std::cout << x << std::endl;
-        }
-
-        std::cout << std::endl;
-
-        std::copy(off_m.begin(), off_m.end(), d_off_m_);
-        std::copy(off_n.begin(), off_n.end(), d_off_n_);
+        std::memcpy(d_off_m_, off_m.data(),
+                    diag_off_size_ * sizeof(std::size_t));
+        std::memcpy(d_off_n_, off_n.data(),
+                    diag_off_size_ * sizeof(std::size_t));
 
 #if defined(HAS_TUNING)
-        cuda_exec(cudaMemPrefetchAsync(
-            d_off_m_, diag_off_size_ * sizeof(std::size_t), A__.dev_id(), 0));
-        cuda_exec(cudaMemPrefetchAsync(
-            d_off_n_, diag_off_size_ * sizeof(std::size_t), A__.dev_id(), 0));
+        if (diag_off_size_ > 0)
+        {
+            cuda_exec(cudaMemPrefetchAsync(d_off_m_,
+                                           diag_off_size_ * sizeof(std::size_t),
+                                           A__.dev_id(), 0));
+            cuda_exec(cudaMemPrefetchAsync(d_off_n_,
+                                           diag_off_size_ * sizeof(std::size_t),
+                                           A__.dev_id(), 0));
+        }
 #endif
 
         cuda_exec(cudaStreamCreate(&stream1_));
@@ -1026,8 +1015,8 @@ private:
     // cuRAND
     curandStatePhilox4_32_10_t* states_ = NULL;
     T* d_work_ =
-        NULL; //!< a pointer to a local buffer on GPU, which is reserved for the
-              //!< extra buffer required for any cuSOLVER routines
+        NULL; //!< a pointer to a local buffer on GPU, which is reserved
+              //!< for the extra buffer required for any cuSOLVER routines
     T* d_v_;
     T* d_w_;
     int* devInfo_ =
