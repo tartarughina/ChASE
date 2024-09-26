@@ -372,10 +372,10 @@ public:
         }
         diag_off_size_ = off_m.size();
 
-        cudaMallocManaged((void**)&(d_off_m_),
-                          diag_off_size_ * sizeof(std::size_t));
-        cudaMallocManaged((void**)&(d_off_n_),
-                          diag_off_size_ * sizeof(std::size_t));
+        cuda_exec(cudaMallocManaged((void**)&d_off_m_,
+                                    diag_off_size_ * sizeof(std::size_t)));
+        cuda_exec(cudaMallocManaged((void**)&d_off_n_,
+                                    diag_off_size_ * sizeof(std::size_t)));
 
         std::memcpy(d_off_m_, off_m.data(),
                     diag_off_size_ * sizeof(std::size_t));
@@ -383,7 +383,6 @@ public:
                     diag_off_size_ * sizeof(std::size_t));
 
 #if defined(HAS_TUNING)
-        printf("Device %d\n", A__.dev_id());
         cuda_exec(cudaMemPrefetchAsync(
             d_off_m_, diag_off_size_ * sizeof(std::size_t), A__.dev_id(), 0));
         cuda_exec(cudaMemPrefetchAsync(
