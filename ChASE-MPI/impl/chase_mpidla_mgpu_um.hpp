@@ -389,7 +389,6 @@ public:
         std::cout << "diag_off_size_: " << diag_off_size_ << std::endl;
         int dev_id = A__.dev_id();
         std::cout << "Device ID: " << dev_id << std::endl;
-        assert(dev_id >= 0 && dev_id < cudaGetDeviceCount());
 
         cuda_exec(cudaMemPrefetchAsync(
             d_off_m_, diag_off_size_ * sizeof(std::size_t), A__.dev_id(), 0));
