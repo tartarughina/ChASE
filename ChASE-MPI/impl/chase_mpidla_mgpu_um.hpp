@@ -9,6 +9,7 @@
 
 #include <assert.h>
 #include <complex>
+#include <cstring>
 #include <cuComplex.h>
 #include <cublas_v2.h>
 #include <cuda.h>
@@ -381,6 +382,13 @@ public:
         std::memcpy(d_off_n_, off_n.data(),
                     diag_off_size_ * sizeof(std::size_t));
 
+#if defined(HAS_TUNING)
+        cuda_exec(cudaMemPrefetchAsync(
+            d_off_m_, diag_off_size_ * sizeof(std::size_t), A__.dev_id(), 0));
+        cuda_exec(cudaMemPrefetchAsync(
+            d_off_n_, diag_off_size_ * sizeof(std::size_t), A__.dev_id(), 0));
+#endif
+
         cuda_exec(cudaStreamCreate(&stream1_));
         cuda_exec(cudaStreamCreate(&stream2_));
 
@@ -439,9 +447,8 @@ public:
 
         chase_rand_normal(seed, states_, C__.device(), m_ * (nev_ + nex_),
                           (cudaStream_t)0);
-#if !defined(CUDA_AWARE)
+
         C__.D2H(m_, nev_ + nex_);
-#endif
     }
 
     //! - This function set initially the operation for apply() in filter
@@ -449,12 +456,11 @@ public:
     void preApplication(T* V, std::size_t locked, std::size_t block) override
     {
         next_ = NextOp::bAc;
-#if !defined(CUDA_AWARE)
+
         if (locked > 0)
         {
             C__.H2D(m_, block, locked);
         }
-#endif
     }
 
     //! - This function performs the local computation of `GEMM` for
@@ -547,17 +553,27 @@ public:
     {
         T alpha = T(1.0);
         T beta = T(0.0);
-        ////
-        cuda_exec(
-            cudaMemcpy(d_v_, v, m_ * n * sizeof(T), cudaMemcpyHostToDevice));
+
+        std::memcpy(d_v_, v, m_ * n * sizeof(T));
+// cuda_exec(
+//     cudaMemcpy(d_v_, v, m_ * n * sizeof(T), cudaMemcpyHostToDevice));
+#if defined(HAS_TUNING)
+        cudaMemPrefetchAsync(d_v_, m_ * n * sizeof(T), A__.dev_id(), 0);
+#endif
+
         cublas_status_ =
             cublasTgemm(cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, n_, n, m_, &alpha,
                         H__.device(), H__.d_ld(), d_v_, m_, &beta, d_w_, n_);
 
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
-        cuda_exec(
-            cudaMemcpy(w, d_w_, n * n_ * sizeof(T), cudaMemcpyDeviceToHost));
+// cuda_exec(
+//     cudaMemcpy(w, d_w_, n * n_ * sizeof(T), cudaMemcpyDeviceToHost));
+#if defined(HAS_TUNING)
+        cuda_exec(cudaMemPrefetchAsync(d_w_, n * n_ * sizeof(T), -1, 0));
+#endif
+        cuda_exec(cudaDeviceSynchronize());
+        std::memcpy(w, d_w_, n * n_ * sizeof(T));
     }
 
     bool checkSymmetryEasy() override { return false; }
@@ -567,8 +583,16 @@ public:
     int get_nprocs() const override { return matrix_properties_->get_nprocs(); }
     void Start() override {}
     void End() override { C__.D2H(m_, nev_); }
-    Base<T>* get_Resids() override { return Resid__.host(); }
-    Base<T>* get_Ritzv() override { return Ritzv__.host(); }
+    Base<T>* get_Resids() override
+    {
+        Resid__.D2H();
+        return Resid__.host();
+    }
+    Base<T>* get_Ritzv() override
+    {
+        Ritz__.D2H();
+        return Ritzv__.host();
+    }
 
     //! It is an interface to BLAS `?axpy`.
     void axpy(std::size_t N, T* alpha, T* x, std::size_t incx, T* y,
@@ -706,7 +730,6 @@ public:
                      B2__.device() + locked * n_, n_, Ritzv__.device(),
                      Resid__.device() + locked, false, (cudaStream_t)0);
 
-        // Suggested by GPT
         // Resid__.D2H(locked, unconverged);
     }
     //! - This function performs the local computation for ChaseMpiDLA::heevd()
@@ -732,9 +755,10 @@ public:
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
-        // as before should this be changed to a memcpy as well?
-        cuda_exec(cudaMemcpy(w, Ritzv__.device(), n * sizeof(Base<T>),
-                             cudaMemcpyDeviceToHost));
+        Ritzv__.D2H();
+        std::memcpy(w, Ritzv__.device(), n * sizeof(Base<T>));
+        // cuda_exec(cudaMemcpy(w, Ritzv__.device(), n * sizeof(Base<T>),
+        //                      cudaMemcpyDeviceToHost));
 
         C2__.H2D(m_, n, locked);
 
@@ -782,8 +806,14 @@ public:
             cuda_exec(
                 cudaMallocManaged((void**)&(d_ritzVc_), m * idx * sizeof(T)));
         }
-        cuda_exec(cudaMemcpy(d_ritzVc_, ritzVc, m * idx * sizeof(T),
-                             cudaMemcpyHostToDevice));
+        // cuda_exec(cudaMemcpy(d_ritzVc_, ritzVc, m * idx * sizeof(T),
+        //                      cudaMemcpyHostToDevice));
+        std::memcpy(d_ritzVc_, ritzVc, m * idx * sizeof(T));
+
+#if defined(HAS_TUNING)
+        cuda_exec(cudaMemPrefetchAsync(d_ritzVc_, m * idx * sizeof(T),
+                                       A__.dev_id(), 0));
+#endif
 
         cublas_status_ = cublasTgemm(cublasH_, CUBLAS_OP_N, CUBLAS_OP_N, m_,
                                      idx, m, &alpha, C__.device(), m_,

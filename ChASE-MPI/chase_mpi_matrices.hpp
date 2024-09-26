@@ -247,7 +247,7 @@ public:
             case 3:
                 Host_ = std::make_shared<UnifiedMem<T>>(ptr, ld * n);
                 Device_ = Host_;
-                isHostAlloc_ = true;
+                isHostAlloc_ = false;
                 isDeviceAlloc_ = true;
                 break;
 #else
@@ -293,9 +293,15 @@ public:
         return ptr;
     }
 
+#if defined(HAS_UM)
+    int dev_id() { return Host_.get()->dev_id(); }
+#endif
+
     void swap(Matrix<T>& swapping_obj)
     {
         std::swap(Host_, swapping_obj.Host_);
+
+        // Swap Device_ only if CUDA is enabled but Unified Memory is not
 #if defined(HAS_CUDA) && !defined(HAS_UM)
         std::swap(Device_, swapping_obj.Device_);
 #endif
@@ -316,11 +322,12 @@ public:
 #if defined(HAS_CUDA)
     void H2D()
     {
-#if defined(HAS_UM) && defined(HAS_TUNING)
+#if defined(HAS_UM)
+#if defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              Device_.get()->dev_id(), 0);
-        cudaDeviceSynchronize();
-#elif defined(HAS_UM) && !defined(HAS_TUNING)
+        // cudaDeviceSynchronize();
+#endif
         // Do nothing
 #else
         cublasSetMatrix(m_, n_, sizeof(T), this->host(), this->h_ld(),
@@ -330,14 +337,17 @@ public:
 
     void H2D(std::size_t nrows, std::size_t ncols, std::size_t offset = 0)
     {
-#if defined(HAS_UM) && defined(HAS_TUNING)
-        // Prefetch the specific part of the matrix to the GPU
+#if defined(HAS_UM)
+// Prefetch the specific part of the matrix to the GPU
+#if defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), Device_.get()->dev_id(),
                              0);
-        cudaDeviceSynchronize();
-#elif defined(HAS_UM) && !defined(HAS_TUNING)
-        // Do nothing since UM is enabled but no tuning is required
+
+// cudaDeviceSynchronize();
+#endif
+
+        // No sync is required from host to device
 #else
         // Standard host-to-device memory transfer using cuBLAS
         cublasSetMatrix(nrows, ncols, sizeof(T),
@@ -348,13 +358,15 @@ public:
 
     void D2H()
     {
-#if defined(HAS_UM) && defined(HAS_TUNING)
+#if defined(HAS_UM)
+#if defined(HAS_TUNING)
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              cudaCpuDeviceId, 0);
+#endif
+        // Before accessing the data on the host, make sure that the GPU work is
+        // done
         cudaDeviceSynchronize();
-#elif defined(HAS_UM) && !defined(HAS_TUNING)
-        // Do nothing since UM is enabled but no tuning is required
 #else
         // Standard device-to-host memory transfer using cuBLAS
         cublasGetMatrix(m_, n_, sizeof(T), this->device(), this->d_ld(),
@@ -364,12 +376,14 @@ public:
 
     void D2H(std::size_t nrows, std::size_t ncols, std::size_t offset = 0)
     {
-#if defined(HAS_UM) && defined(HAS_TUNING)
+#if defined(HAS_UM)
+#if defined(HAS_TUNING)
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), cudaCpuDeviceId, 0);
+
+#endif
         cudaDeviceSynchronize();
-#elif defined(HAS_UM) && !defined(HAS_TUNING)
         // Do nothing since UM is enabled but no tuning is required
 #else
         // Standard device-to-host memory transfer using cuBLAS
@@ -383,13 +397,14 @@ public:
     void sync2Ptr(std::size_t nrows, std::size_t ncols, std::size_t offset = 0)
     {
 #if defined(HAS_CUDA)
-#if defined(HAS_UM) && defined(HAS_TUNING)
+#if defined(HAS_UM)
+#if defined(HAS_TUNING)
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), cudaCpuDeviceId, 0);
+
+#endif
         cudaDeviceSynchronize();
-#elif defined(HAS_UM) && !defined(HAS_TUNING)
-        // Do nothing since UM is enabled but no tuning is required
 #else
         // Standard device-to-host memory transfer using cuBLAS
         cublasGetMatrix(nrows, ncols, sizeof(T),
@@ -402,13 +417,14 @@ public:
     void sync2Ptr()
     {
 #if defined(HAS_CUDA)
-#if defined(HAS_UM) && defined(HAS_TUNING)
+#if defined(HAS_UM)
+#if defined(HAS_TUNING)
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              cudaCpuDeviceId, 0);
+
+#endif
         cudaDeviceSynchronize();
-#elif defined(HAS_UM) && !defined(HAS_TUNING)
-        // Do nothing since UM is enabled but no tuning is required
 #else
         // Standard device-to-host memory transfer using cuBLAS
         cublasGetMatrix(m_, n_, sizeof(T), this->device(), this->d_ld(),
@@ -421,13 +437,14 @@ public:
                      std::size_t offset = 0)
     {
 #if defined(HAS_CUDA)
-#if defined(HAS_UM) && defined(HAS_TUNING)
+#if defined(HAS_UM)
+#if defined(HAS_TUNING)
         // Prefetch the specific part of the matrix to the GPU
         cudaMemPrefetchAsync(this->device() + offset * this->d_ld(),
                              nrows * ncols * sizeof(T), Device_.get()->dev_id(),
                              0);
-        cudaDeviceSynchronize();
-#elif defined(HAS_UM) && !defined(HAS_TUNING)
+// cudaDeviceSynchronize();
+#endif
         // Do nothing since UM is enabled but no tuning is required
 #else
         // Standard host-to-device memory transfer using cuBLAS
@@ -441,11 +458,12 @@ public:
     void syncFromPtr()
     {
 #if defined(HAS_CUDA)
-#if defined(HAS_UM) && defined(HAS_TUNING)
+#if defined(HAS_UM)
+#if defined(HAS_TUNING)
         cudaMemPrefetchAsync(this->device(), ld_ * n_ * sizeof(T),
                              Device_.get()->dev_id(), 0);
         cudaDeviceSynchronize();
-#elif defined(HAS_UM) && !defined(HAS_TUNING)
+#endif
         // Do nothing
 #else
         cublasSetMatrix(m_, n_, sizeof(T), this->host(), this->h_ld(),

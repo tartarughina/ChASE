@@ -790,6 +790,10 @@ public:
         T One = T(1.0);
         T Zero = T(0.0);
 
+#if defined(HAS_TUNING)
+        matrices_->H().D2H();
+#endif
+
         t_gemm(CblasColMajor, CblasConjTrans, CblasNoTrans,  //
                n_, 1, m_,                                    //
                &One,                                         //
@@ -994,6 +998,7 @@ public:
         nvtxRangePop();
         nvtxRangePushA("allreduce");
 #endif
+
         AllReduce(allreduce_backend, A, (nev_ + nex_) * block, getMPI_Type<T>(),
                   MPI_SUM, row_comm_, mpi_wrapper_);
 
