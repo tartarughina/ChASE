@@ -381,8 +381,15 @@ public:
         std::cout << "diag_off_size_ = " << diag_off_size_ << std::endl;
         std::cout << d_off_m_ << " " << d_off_n_ << std::endl;
         std::cout << d_off_n_ << " " << d_off_m_ << std::endl;
-        std::cout << off_m << std::endl;
-        std::cout << off_n << std::endl;
+
+        for (auto x : off_m)
+        {
+            std::cout << x << std::endl;
+        }
+        for (auto x : off_n)
+        {
+            std::cout << x << std::endl;
+        }
 
         std::copy(off_m.begin(), off_m.end(), d_off_m_);
         std::copy(off_n.begin(), off_n.end(), d_off_n_);
