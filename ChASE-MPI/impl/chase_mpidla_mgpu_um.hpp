@@ -590,7 +590,7 @@ public:
     }
     Base<T>* get_Ritzv() override
     {
-        Ritz__.D2H();
+        Ritzv__.D2H();
         return Ritzv__.host();
     }
 
