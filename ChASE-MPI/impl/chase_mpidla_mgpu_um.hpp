@@ -384,12 +384,17 @@ public:
 
         for (auto x : off_m)
         {
-            std::cout << x << std::endl;
+            std::cout << x << " ";
         }
+
+        std::cout << std::endl;
+
         for (auto x : off_n)
         {
             std::cout << x << std::endl;
         }
+
+        std::cout << std::endl;
 
         std::copy(off_m.begin(), off_m.end(), d_off_m_);
         std::copy(off_n.begin(), off_n.end(), d_off_n_);
