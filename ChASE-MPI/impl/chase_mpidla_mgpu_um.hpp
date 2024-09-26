@@ -377,19 +377,10 @@ public:
         cuda_exec(cudaMallocManaged((void**)&d_off_n_,
                                     diag_off_size_ * sizeof(std::size_t)));
 
-        std::memcpy(d_off_m_, off_m.data(),
-                    diag_off_size_ * sizeof(std::size_t));
-        std::memcpy(d_off_n_, off_n.data(),
-                    diag_off_size_ * sizeof(std::size_t));
+        std::copy(off_m.begin(), off_m.end(), d_off_m_);
+        std::copy(off_n.begin(), off_n.end(), d_off_n_);
 
 #if defined(HAS_TUNING)
-        assert(d_off_m_ != nullptr);
-        assert(d_off_n_ != nullptr);
-
-        std::cout << "diag_off_size_: " << diag_off_size_ << std::endl;
-        int dev_id = A__.dev_id();
-        std::cout << "Device ID: " << dev_id << std::endl;
-
         cuda_exec(cudaMemPrefetchAsync(
             d_off_m_, diag_off_size_ * sizeof(std::size_t), A__.dev_id(), 0));
         cuda_exec(cudaMemPrefetchAsync(
