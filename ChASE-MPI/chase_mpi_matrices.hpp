@@ -301,8 +301,7 @@ public:
     {
         std::swap(Host_, swapping_obj.Host_);
 
-        // Swap Device_ only if CUDA is enabled but Unified Memory is not
-#if defined(HAS_CUDA) && !defined(HAS_UM)
+#if defined(HAS_CUDA)
         std::swap(Device_, swapping_obj.Device_);
 #endif
     }
