@@ -207,11 +207,13 @@ int do_chase(ChASE_DriverProblemConfig& conf)
     Base<T>* Lambda;
 
 #ifdef HAS_UM
+    std::cout << "using Unified Memory" << std::endl;
     cudaMallocManaged((void**)&V, m_ * (nev + nex) * sizeof(T));
     cudaMallocManaged((void**)&Lambda, (nev + nex) * sizeof(Base<T>));
     cudaMallocManaged((void**)&H, ldh_ * n_ * sizeof(T));
 
 #ifdef HAS_TUNING
+    std::cout << "tuning Unified Memory" << std::endl;
     int device;
     cudaGetDevice(&device);
     cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T),
