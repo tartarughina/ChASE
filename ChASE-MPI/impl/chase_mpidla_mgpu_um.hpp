@@ -714,6 +714,7 @@ public:
         {
             /* Ensure that the value for devInfo is available on the CPU */
             cudaDeviceSynchronize();
+            std::cout << "devInfo = " << *devInfo_ << std::endl;
             return *devInfo_;
         }
 

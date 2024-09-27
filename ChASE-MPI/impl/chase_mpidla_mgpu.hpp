@@ -665,9 +665,9 @@ public:
 #ifdef USE_NSIGHT
         nvtxRangePushA("cusolverDnTpotrf");
 #endif
-        cusolver_status_ = cusolverDnTpotrf(
-            cusolverH_, CUBLAS_FILL_MODE_UPPER, nev_ + nex_, A__.device(),
-            nev_ + nex_, d_work_, lwork_, devInfo_);
+        cusolver_status_ =
+            cusolverDnT(cusolverH_, CUBLAS_FILL_MODE_UPPER, nev_ + nex_,
+                        A__.device(), nev_ + nex_, d_work_, lwork_, devInfo_);
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
