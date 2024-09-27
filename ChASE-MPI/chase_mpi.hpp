@@ -17,14 +17,9 @@
 
 #include "algorithm/chase.hpp"
 
+#include "./impl/chase_mpidla.hpp"
 #include "blas_templates.hpp"
 #include "chase_mpi_matrices.hpp"
-
-#if defined(HAS_UM)
-#include "./impl/chase_mpidla_um.hpp"
-#else
-#include "./impl/chase_mpidla.hpp"
-#endif
 
 namespace chase
 {

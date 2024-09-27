@@ -178,20 +178,23 @@ if(CMAKE_CUDA_COMPILER)
     target_compile_definitions( chase_cuda INTERFACE
    "-DHAS_CUDA"
         )
-    if(ENABLE_UM)
-        target_compile_definitions( chase_cuda INTERFACE
-            "-DHAS_UM"
-          )
-    endif()
-    if(ENABLE_TUNING)
-        target_compile_definitions( chase_cuda INTERFACE
-            "-DHAS_TUNING"
-          )
-    endif()
+
     if(ENABLE_CUDA_AWARE_MPI)
         target_compile_definitions( chase_cuda INTERFACE
             "-DCUDA_AWARE"
           )
+
+        if(ENABLE_UM)
+            target_compile_definitions( chase_cuda INTERFACE
+                  "-DHAS_UM"
+                )
+        endif()
+
+        if(ENABLE_TUNING)
+            target_compile_definitions( chase_cuda INTERFACE
+                  "-DHAS_TUNING"
+                )
+        endif()
 
         if(ENABLE_NCCL)
             find_package( NVHPC REQUIRED COMPONENTS NCCL )

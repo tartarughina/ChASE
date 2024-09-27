@@ -312,7 +312,7 @@ public:
         vv = matrices_->vv_comm();
         rsd = matrices_->Resid_comm();
 
-        if (matrices_->get_Mode() == 2)
+        if (matrices_->get_Mode() == 2 || matrices_->get_Mode() == 3)
         {
             cuda_aware_ = true;
         }
@@ -350,7 +350,9 @@ public:
             auto max_c_len = *max_element(c_lens.begin(), c_lens.end());
             if (cuda_aware_)
             {
-                buff__ = std::make_unique<Matrix<T>>(2, max_c_len, nex_ + nev_);
+                // Replace 2 with the get_Mode() function to handle also UM
+                buff__ = std::make_unique<Matrix<T>>(matrices_->get_Mode(),
+                                                     max_c_len, nex_ + nev_);
             }
             else
             {
@@ -786,6 +788,10 @@ public:
 
         T One = T(1.0);
         T Zero = T(0.0);
+
+#if defined(HAS_UM)
+        matrices_->H().D2H();
+#endif
 
         t_gemm(CblasColMajor, CblasConjTrans, CblasNoTrans,  //
                n_, 1, m_,                                    //
