@@ -238,6 +238,7 @@ public:
     Matrix(int mode, std::size_t m, std::size_t n, T* ptr, std::size_t ld)
         : m_(m), n_(n), ld_(ld), mode_(mode)
     {
+        std::cout << "m_ " << m << " ld_ " << ld << std::endl;
         switch (mode)
         {
 #if defined(HAS_UM)
@@ -301,7 +302,7 @@ public:
     {
         std::swap(Host_, swapping_obj.Host_);
 
-#if defined(HAS_CUDA)
+#if defined(HAS_CUDA) && !defined(HAS_UM)
         std::swap(Device_, swapping_obj.Device_);
 #endif
     }
