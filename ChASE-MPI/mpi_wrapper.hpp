@@ -1,11 +1,9 @@
 #pragma once
 #include <map>
 #if defined(HAS_NCCL)
-#include <nccl.h>
-#endif
-#if defined(HAS_UM)
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <nccl.h>
 #endif
 #include <mpi.h>
 
