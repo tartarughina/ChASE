@@ -697,6 +697,7 @@ public:
 #if !defined(CUDA_AWARE)
         A__.H2D(nev_ + nex_, nev_ + nex_);
 #endif
+        A__.H2D(nev_ + nex_, nev_ + nex_);
 
 #ifdef USE_NSIGHT
         nvtxRangePushA("cusolverDnTpotrf");
