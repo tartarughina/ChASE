@@ -325,6 +325,9 @@ public:
             cusolverH_, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER,
             nev_ + nex_, A__.device(), nev_ + nex_, Ritzv__.device(),
             &lwork_heevd);
+
+        cudaDeviceSynchronize();
+
         assert(cusolver_status_ == CUSOLVER_STATUS_SUCCESS);
 
         if (lwork_heevd > lwork_)
@@ -336,6 +339,9 @@ public:
         cusolver_status_ = cusolverDnTpotrf_bufferSize(
             cusolverH_, CUBLAS_FILL_MODE_UPPER, nev_ + nex_, A__.device(),
             nev_ + nex_, &lwork_potrf);
+
+        cudaDeviceSynchronize();
+
         assert(cusolver_status_ == CUSOLVER_STATUS_SUCCESS);
 
         if (lwork_potrf > lwork_)
@@ -492,6 +498,9 @@ public:
                             &alpha, H__.device(), H__.d_ld(),
                             C__.device() + locked * m_ + offset * m_, m_, &beta,
                             B__.device() + locked * n_ + offset * n_, n_);
+
+            cudaDeviceSynchronize();
+
             assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
 #if !defined(CUDA_AWARE)
@@ -514,6 +523,9 @@ public:
                             &alpha, H__.device(), H__.d_ld(),
                             B__.device() + locked * n_ + offset * n_, n_, &beta,
                             C__.device() + locked * m_ + offset * m_, m_);
+
+            cudaDeviceSynchronize();
+
             assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
 #if !defined(CUDA_AWARE)
@@ -556,6 +568,9 @@ public:
                                      block, m_, &alpha, H__.device(),
                                      H__.d_ld(), C__.device() + locked * m_, m_,
                                      &beta, B__.device() + locked * n_, n_);
+
+        cudaDeviceSynchronize();
+
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
 #if !defined(CUDA_AWARE)
@@ -581,6 +596,8 @@ public:
         cublas_status_ =
             cublasTgemm(cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, n_, n, m_, &alpha,
                         H__.device(), H__.d_ld(), d_v_, m_, &beta, d_w_, n_);
+
+        cudaDeviceSynchronize();
 
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
@@ -626,6 +643,9 @@ public:
     {
         Base<T> nrm;
         cublas_status_ = cublasTnrm2(cublasH_, n, x, incx, &nrm);
+
+        cudaDeviceSynchronize();
+
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
         return nrm;
     }
@@ -654,6 +674,9 @@ public:
             cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, block, block, n_, &One,
             B2__.device() + locked * n_, n_, B__.device() + locked * n_, n_,
             &Zero, A__.device(), nev_ + nex_);
+
+        cudaDeviceSynchronize();
+
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
 #if !defined(CUDA_AWARE)
@@ -684,6 +707,9 @@ public:
         cublas_status_ = cublasTsyherk(cublasH_, CUBLAS_FILL_MODE_UPPER, transa,
                                        nev_ + nex_, m_, &One, C__.device(), m_,
                                        &Zero, A__.device(), nev_ + nex_);
+
+        cudaDeviceSynchronize();
+
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 #if !defined(CUDA_AWARE)
         A__.D2H(nev_ + nex_, nev_ + nex_);
@@ -697,7 +723,6 @@ public:
 #if !defined(CUDA_AWARE)
         A__.H2D(nev_ + nex_, nev_ + nex_);
 #endif
-        A__.H2D(nev_ + nex_, nev_ + nex_);
 
 #ifdef USE_NSIGHT
         nvtxRangePushA("cusolverDnTpotrf");
@@ -708,6 +733,9 @@ public:
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
+
+        cudaDeviceSynchronize();
+
         assert(CUSOLVER_STATUS_SUCCESS == cusolver_status_);
 
         // int info = 0;
@@ -731,6 +759,9 @@ public:
             cublasTtrsm(cublasH_, CUBLAS_SIDE_RIGHT, CUBLAS_FILL_MODE_UPPER,
                         CUBLAS_OP_N, CUBLAS_DIAG_NON_UNIT, m_, nev_ + nex_,
                         alpha, A__.device(), nev_ + nex_, C__.device(), m_);
+
+        cudaDeviceSynchronize();
+
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
 #if !defined(CUDA_AWARE)
@@ -756,6 +787,8 @@ public:
                      B2__.device() + locked * n_, n_, Ritzv__.device(),
                      Resid__.device() + locked, false, (cudaStream_t)0);
 
+        cudaDeviceSynchronize();
+
         // Resid__.D2H(locked, unconverged);
     }
     //! - This function performs the local computation for
@@ -780,6 +813,9 @@ public:
             cusolverH_, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, n,
             A__.device(), nev_ + nex_, Ritzv__.device(), d_work_, lwork_,
             devInfo_);
+
+        cudaDeviceSynchronize();
+
         assert(cusolver_status_ == CUSOLVER_STATUS_SUCCESS);
 #ifdef USE_NSIGHT
         nvtxRangePop();
@@ -797,6 +833,8 @@ public:
             cublasTgemm(cublasH_, CUBLAS_OP_N, CUBLAS_OP_N, m_, n, n, &One,
                         C2__.device() + locked * m_, m_, A__.device(),
                         nev_ + nex_, &Zero, C__.device() + locked * m_, m_);
+
+        cudaDeviceSynchronize();
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
 #if !defined(CUDA_AWARE)
@@ -944,6 +982,8 @@ public:
         cublas_status_ = cublasTgemm(
             cublasH_, CUBLAS_OP_C, CUBLAS_OP_N, n_, k, m_, &alpha, H__.device(),
             H__.d_ld(), v->device(), v->d_ld(), &beta, w->device(), w->d_ld());
+
+        cudaDeviceSynchronize();
 
         assert(cublas_status_ == CUBLAS_STATUS_SUCCESS);
 
