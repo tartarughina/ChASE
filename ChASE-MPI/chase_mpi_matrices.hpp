@@ -247,7 +247,7 @@ public:
             case 3:
                 Host_ = std::make_shared<UnifiedMem<T>>(ptr, ld * n);
                 Device_ = Host_;
-                isHostAlloc_ = false;
+                isHostAlloc_ = true;
                 isDeviceAlloc_ = true;
                 break;
 #else
