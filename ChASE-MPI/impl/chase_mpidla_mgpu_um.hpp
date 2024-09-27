@@ -790,7 +790,7 @@ public:
 
         cudaDeviceSynchronize();
 
-        // Resid__.D2H(locked, unconverged);
+        Resid__.D2H(locked, unconverged);
     }
     //! - This function performs the local computation for
     //! ChaseMpiDLA::heevd()
