@@ -17,9 +17,10 @@
 
 #include "algorithm/chase.hpp"
 
-#include "./impl/chase_mpidla.hpp"
 #include "blas_templates.hpp"
 #include "chase_mpi_matrices.hpp"
+
+#include "./impl/chase_mpidla.hpp"
 
 namespace chase
 {

@@ -8,9 +8,7 @@
 #pragma once
 
 #include <assert.h>
-#include <cassert>
 #include <complex>
-#include <cstring>
 #include <cuComplex.h>
 #include <cublas_v2.h>
 #include <cuda.h>
