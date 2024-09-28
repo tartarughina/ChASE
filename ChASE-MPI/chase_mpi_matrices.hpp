@@ -238,7 +238,6 @@ public:
     Matrix(int mode, std::size_t m, std::size_t n, T* ptr, std::size_t ld)
         : m_(m), n_(n), ld_(ld), mode_(mode)
     {
-        std::cout << "m_ " << m << " ld_ " << ld << std::endl;
         switch (mode)
         {
 #if defined(HAS_UM)
@@ -248,6 +247,9 @@ public:
             case 3:
                 Host_ = std::make_shared<UnifiedMem<T>>(ptr, ld * n);
                 Device_ = Host_;
+                // As m_ may differ from ld_ for Unified Memory it will match
+                // ld_
+                m_ = ld;
                 isHostAlloc_ = false;
                 isDeviceAlloc_ = true;
                 break;
@@ -300,6 +302,11 @@ public:
 
     void swap(Matrix<T>& swapping_obj)
     {
+        std::cout << "Swapping" << std::endl;
+        std::cout << Host_ << " <-- from - to --> " << swapping_obj.Host_
+                  << std::endl;
+        std::cout << Device_ << " <-- from - to --> " << swapping_obj.Device_
+                  << std::endl;
         std::swap(Host_, swapping_obj.Host_);
 
 #if defined(HAS_CUDA) && !defined(HAS_UM)
