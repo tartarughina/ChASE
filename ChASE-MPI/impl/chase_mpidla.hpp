@@ -1045,6 +1045,9 @@ public:
             //	std::cout << "rsd != Resid().ptr()" << std::endl;
             matrices_->Resid().sync2Ptr(1, unconverged, locked);
         }
+#if defined(HAS_UM)
+        matrices_->Resid().sync2Ptr(1, unconverged, locked);
+#endif
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
@@ -1106,6 +1109,9 @@ public:
         {
             matrices_->C().sync2Ptr();
         }
+#if defined(HAS_UM)
+        matrices_->C().sync2Ptr();
+#endif
         t_pgeqrf(N_, nevex, matrices_->C().ptr(), one, one, desc1D_Nxnevx_,
                  tau.get());
         t_pgqr(N_, nevex, nevex, matrices_->C().ptr(), one, one, desc1D_Nxnevx_,
@@ -1114,6 +1120,9 @@ public:
         {
             matrices_->C().syncFromPtr();
         }
+#if defined(HAS_UM)
+        matrices_->C().syncFromPtr();
+#endif
 #ifdef USE_NSIGHT
         nvtxRangePop();
         nvtxRangePushA("memcpy");
@@ -1133,6 +1142,9 @@ public:
         {
             matrices_->C().sync2Ptr();
         }
+#if defined(HAS_UM)
+        matrices_->C().sync2Ptr();
+#endif
 
         if (!alloc_)
         {
@@ -1353,6 +1365,9 @@ public:
         {
             matrices_->C().sync2Ptr();
         }
+#if defined(HAS_UM)
+        matrices_->C().sync2Ptr();
+#endif
 
         this->collecRedundantVecs(matrices_->C().ptr(), V2.data(), 0,
                                   nev_ + nex_);
