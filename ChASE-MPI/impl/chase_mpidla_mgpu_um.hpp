@@ -620,8 +620,8 @@ public:
     {
 #if defined(CUDA_AWARE)
         C__.D2H(m_, nev_);
-        // Resid__.D2H();
-        // Ritzv__.D2H();
+        Resid__.D2H();
+        Ritzv__.D2H();
 #endif
     }
     Base<T>* get_Resids() override { return Resid__.host(); }
