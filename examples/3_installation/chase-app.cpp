@@ -17,7 +17,11 @@
 
 #ifdef DRIVER_BUILD_MGPU
 #include "ChASE-MPI/impl/chase_mpidla_cuda_seq.hpp"
+#ifdef HAS_UM
+#include "ChASE-MPI/impl/chase_mpidla_mgpu_um.hpp"
+#else
 #include "ChASE-MPI/impl/chase_mpidla_mgpu.hpp"
+#endif
 #endif
 
 using T = std::complex<double>;
@@ -37,10 +41,9 @@ int main(int argc, char** argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    std::size_t N = 1001; // problem size
+    std::size_t N = 1001;  // problem size
     std::size_t nev = 100; // number of eigenpairs to be computed
-    std::size_t nex = 40; // extra searching space
-
+    std::size_t nex = 40;  // extra searching space
 
     auto props = new ChaseMpiProperties<T>(N, nev, nex, MPI_COMM_WORLD);
 
@@ -48,9 +51,22 @@ int main(int argc, char** argv)
     auto n_ = props->get_n();
     auto ldh_ = props->get_ldh();
 
+#ifdef HAS_UM
+    T *V_m, *H_m;
+    Base<T>* Lambda_m;
+    cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
+
+    auto V = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
+    auto Lambda =
+        std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
+    auto H = std::vector<T>(H_m, H_m + ldh_ * n_);
+#else
     auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
-    auto H = std::vector<T>(ldh_ * n_);
+    auto H = std::vector<T>(ldh_ * n_);            // eigevectors
+#endif
 
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
 
@@ -84,8 +100,7 @@ int main(int argc, char** argv)
     {
         for (std::size_t y = 0; y < ylen; y++)
         {
-            H[x + xlen * y] =
-                Clement[(xoff + x) * N + (yoff + y)];
+            H[x + xlen * y] = Clement[(xoff + x) * N + (yoff + y)];
         }
     }
 
@@ -100,8 +115,7 @@ int main(int argc, char** argv)
     config.SetMaxIter(25);
     if (rank == 0)
         std::cout << "Solving a symmetrized Clement matrices (" << N << "x" << N
-                  << ")"
-                  << '\n'
+                  << ")" << '\n'
                   << config;
 
     /*Performance Decorator to meaure the performance of kernels of ChASE*/
@@ -131,6 +145,13 @@ int main(int argc, char** argv)
                       << std::setw(width) << resid[i] << "  |\n";
         std::cout << "\n\n\n";
     }
+
+#ifdef HAS_UM
+    /*Free the memory of the matrix*/
+    cudaFree(V_m);
+    cudaFree(H_m);
+    cudaFree(Lambda_m);
+#endif
 
     MPI_Finalize();
 }

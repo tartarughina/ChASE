@@ -323,6 +323,7 @@ public:
 
         if (cuda_aware_)
         {
+            // UM uses std:memcpy to copy data between different matrices
             memcpy_mode[0] = CPY_D2D;
             memcpy_mode[1] = CPY_D2H;
             memcpy_mode[2] = CPY_H2D;
@@ -350,9 +351,8 @@ public:
             auto max_c_len = *max_element(c_lens.begin(), c_lens.end());
             if (cuda_aware_)
             {
-                // Replace 2 with the get_Mode() function to handle also UM
-                buff__ = std::make_unique<Matrix<T>>(matrices_->get_Mode(),
-                                                     max_c_len, nex_ + nev_);
+                // Cover cuda-aware and unified memory
+                buff__ = std::make_unique<Matrix<T>>(3, max_c_len, nex_ + nev_);
             }
             else
             {
@@ -789,7 +789,7 @@ public:
         T One = T(1.0);
         T Zero = T(0.0);
 
-#if defined(HAS_UM)
+#if defined(HAS_TUNING)
         matrices_->H().D2H();
 #endif
 
@@ -997,6 +997,7 @@ public:
         nvtxRangePop();
         nvtxRangePushA("allreduce");
 #endif
+
         AllReduce(allreduce_backend, A, (nev_ + nex_) * block, getMPI_Type<T>(),
                   MPI_SUM, row_comm_, mpi_wrapper_);
 
@@ -1009,8 +1010,6 @@ public:
         nvtxRangePop();
         nvtxRangePushA("memcpy");
 #endif
-        // Within this function if Unified Memory don't do anything if not
-        // prefetching data somewhere
         Memcpy(memcpy_mode[0], C2 + locked * m_, C + locked * m_,
                m_ * block * sizeof(T));
 #ifdef USE_NSIGHT
@@ -1040,11 +1039,13 @@ public:
                   getMPI_Type<Base<T>>(), MPI_SUM, row_comm_, mpi_wrapper_);
         //  Base<T> *resid_h;
         // dla_->retrieveResid(&resid_h, locked, unconverged);
-        if (rsd != matrices_->Resid().ptr())
-        {
-            //	std::cout << "rsd != Resid().ptr()" << std::endl;
-            matrices_->Resid().sync2Ptr(1, unconverged, locked);
-        }
+        // if (rsd != matrices_->Resid().ptr())
+        // {
+        //     //	std::cout << "rsd != Resid().ptr()" << std::endl;
+        //     matrices_->Resid().sync2Ptr(1, unconverged, locked);
+        // }
+
+        matrices_->Resid().sync2Ptr(1, unconverged, locked);
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
@@ -1102,18 +1103,23 @@ public:
 #ifdef USE_NSIGHT
         nvtxRangePushA("pgeqrf+pgqr");
 #endif
-        if (C != matrices_->C().ptr())
-        {
-            matrices_->C().sync2Ptr();
-        }
+        // This code was done when the matrices were not unified memory or
+        // simply cudaAware, to fix the thing we need to sync the matrices, just
+        // for the cudeDeviceSynchronize()
+        // if (C != matrices_->C().ptr())
+        // {
+        //     matrices_->C().sync2Ptr();
+        // }
+        matrices_->C().sync2Ptr();
         t_pgeqrf(N_, nevex, matrices_->C().ptr(), one, one, desc1D_Nxnevx_,
                  tau.get());
         t_pgqr(N_, nevex, nevex, matrices_->C().ptr(), one, one, desc1D_Nxnevx_,
                tau.get());
-        if (C != matrices_->C().ptr())
-        {
-            matrices_->C().syncFromPtr();
-        }
+        // if (C != matrices_->C().ptr())
+        // {
+        //     matrices_->C().syncFromPtr();
+        // }
+        matrices_->C().syncFromPtr();
 #ifdef USE_NSIGHT
         nvtxRangePop();
         nvtxRangePushA("memcpy");
@@ -1129,14 +1135,15 @@ public:
             std::cout << "ScaLAPACK is not available, use LAPACK Householder "
                          "QR instead"
                       << std::endl;
-        if (C != matrices_->C().ptr())
-        {
-            matrices_->C().sync2Ptr();
-        }
+        // if (C != matrices_->C().ptr())
+        // {
+        //     matrices_->C().sync2Ptr();
+        // }
+        matrices_->C().sync2Ptr();
 
         if (!alloc_)
         {
-            V___ = std::make_unique<Matrix<T>>(0, N_, nevex);
+            V___ = std::make_unique<Matrix<T>>(3, N_, nevex);
             alloc_ = true;
         }
 
@@ -1349,10 +1356,12 @@ public:
         auto nevex = nev_ + nex_;
 
         std::vector<T> V2(N_ * (nev_ + nex_));
-        if (C != matrices_->C().ptr())
-        {
-            matrices_->C().sync2Ptr();
-        }
+        // if (C != matrices_->C().ptr())
+        // {
+        //     matrices_->C().sync2Ptr();
+        // }
+
+        matrices_->C().sync2Ptr();
 
         this->collecRedundantVecs(matrices_->C().ptr(), V2.data(), 0,
                                   nev_ + nex_);
@@ -1424,18 +1433,14 @@ public:
         std::vector<T> alpha(numvec, T(1.0));
         std::vector<T> beta(numvec, T(0.0));
 
+        // As the mode is set to 3 unified memory will be used
         int matrix_mode = matrices_->get_Mode();
-        if (matrices_->get_Mode() == 2)
-        {
-            matrix_mode = 1;
-        }
+
         v_0 = new Matrix<T>(matrix_mode, m_, numvec);
         v_1 = new Matrix<T>(matrix_mode, m_, numvec);
         v_2 = new Matrix<T>(matrix_mode, m_, numvec);
         v_w = new Matrix<T>(matrix_mode, n_, numvec);
-        // Dear Riccardo... the problem to me seems very easy and straight
-        // forward... you are providing the function un initialized memory and
-        // you are expecting to obtain a result out of it... how sweet
+
         // Memcpy(memcpy_mode[1], v_1->ptr(), C, m_ * numvec * sizeof(T));
         Memcpy(memcpy_mode[1], v_1->ptr(), C, m_ * numvec * sizeof(T));
 

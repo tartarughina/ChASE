@@ -16,7 +16,12 @@
 
 #include "ChASE-MPI/impl/chase_mpidla_blaslapack.hpp"
 #ifdef DRIVER_BUILD_MGPU
+#ifdef HAS_UM
+#include "ChASE-MPI/impl/chase_mpidla_mgpu_um.hpp"
+#else
 #include "ChASE-MPI/impl/chase_mpidla_mgpu.hpp"
+#endif
+
 #endif
 
 using T = std::complex<double>;
@@ -36,9 +41,9 @@ int main(int argc, char** argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    std::size_t N = 1001; // problem size
+    std::size_t N = 1001;  // problem size
     std::size_t nev = 100; // number of eigenpairs to be computed
-    std::size_t nex = 40; // extra searching space
+    std::size_t nex = 40;  // extra searching space
 
     int dims[2];
     dims[0] = dims[1] = 0;
@@ -74,7 +79,7 @@ int main(int argc, char** argv)
         n = std::min(N, N / dims[1] + 1);
     }
 #endif
-
+    printf("Reached MpiProperties\n");
     /*construct eigenproblem to be solved*/
 #ifdef USE_BLOCK_CYCLIC
     auto props =
@@ -86,17 +91,55 @@ int main(int argc, char** argv)
 #else
     auto props = new ChaseMpiProperties<T>(N, nev, nex, MPI_COMM_WORLD);
 #endif
+    printf("Completed MpiProperties initialization\n");
+
+    std::cout << props << std::endl;
 
     auto m_ = props->get_m();
     auto n_ = props->get_n();
     auto ldh_ = props->get_ldh();
+    printf("Retrieval of matrix prop complete\n");
+#ifdef HAS_UM
+    T *V_m, *H_m;
+    Base<T>* Lambda_m;
+    cudaMallocManaged((void**)&V_m, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda_m, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H_m, ldh_ * n_ * sizeof(T));
+    auto V = std::vector<T>(V_m, V_m + m_ * (nev + nex)); // eigevectors
+    auto Lambda =
+        std::vector<Base<T>>(Lambda_m, Lambda_m + (nev + nex)); // eigenvalues
+    auto H = std::vector<T>(H_m, H_m + ldh_ * n_);
+#ifdef HAS_TUNING
+    int device;
+    cudaGetDevice(&device);
+    cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(V_m, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
 
+    cudaMemAdvise(H_m, m_ * ldh_ * n_ * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(H_m, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(H_m, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
+
+    cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, device);
+    cudaMemAdvise(Lambda_m, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
+
+#endif
+#else
     auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
     auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
-    auto H = std::vector<T>(ldh_ * n_);
-
+    auto H = std::vector<T>(ldh_ * n_);            // eigevectors
+#endif
     CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
-
     std::vector<T> Clement(N * N, T(0.0));
 
     /*Generate Clement matrix*/
@@ -139,8 +182,7 @@ int main(int argc, char** argv)
             {
                 for (std::size_t p = 0; p < r_lens[i]; p++)
                 {
-                    H[(q + c_offs_l[j]) * m + p +
-                                          r_offs_l[i]] =
+                    H[(q + c_offs_l[j]) * m + p + r_offs_l[i]] =
                         Clement[(q + c_offs[j]) * N + p + r_offs[i]];
                 }
             }
@@ -158,8 +200,7 @@ int main(int argc, char** argv)
     {
         for (std::size_t y = 0; y < ylen; y++)
         {
-            H[x + xlen * y] =
-                Clement[(xoff + x) * N + (yoff + y)];
+            H[x + xlen * y] = Clement[(xoff + x) * N + (yoff + y)];
         }
     }
 
