@@ -15,6 +15,7 @@ cmake .. \
 cmake .. \
 -DCMAKE_INSTALL_PREFIX=/home/tartarughina/ChASE-um \
 -DENABLE_UM=ON \
+-DCHASE_OUTPUT=ON \
 -DBUILD_WITH_EXAMPLES=ON
 
 # Unified Memory Tuning ChASE build
