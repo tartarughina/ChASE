@@ -305,8 +305,10 @@ public:
         std::cout << "Swapping" << std::endl;
         std::cout << Host_ << " <-- from - to --> " << swapping_obj.Host_
                   << std::endl;
+#if defined(HAS_CUDA)
         std::cout << Device_ << " <-- from - to --> " << swapping_obj.Device_
                   << std::endl;
+#endif
         std::swap(Host_, swapping_obj.Host_);
 
 #if defined(HAS_CUDA) && !defined(HAS_UM)
