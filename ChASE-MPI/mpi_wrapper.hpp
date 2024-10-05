@@ -168,12 +168,14 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count)
             break;
         case CPY_H2D:
 #if defined(HAS_UM)
+            cudaDeviceSynchronize();
             std::memcpy(dst, src, count);
 #if defined(HAS_TUNING)
             int device;
             cudaGetDevice(&device);
             cudaMemPrefetchAsync(dst, count, device, 0);
 #endif
+            cudaDeviceSynchronize();
 #else
             cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice);
 #endif
