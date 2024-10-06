@@ -304,6 +304,8 @@ public:
 
         mpi_wrapper_ = matrix_properties->get_mpi_wrapper();
         matrices_ = dla_->getChaseMatrices();
+        // comm returns the communication pointer, which is always done by NCCL
+        // therefore these are CUDA pointers
         C = matrices_->C_comm();
         B = matrices_->B_comm();
         A = matrices_->A_comm();
@@ -447,6 +449,10 @@ public:
                             r_lens_[i] * sizeof(T));
             }
         }
+
+#if defined(HAS_UM)
+        matrices_->C().H2D();
+#endif
 
         dla_->preApplication(V, locked, block);
 #ifdef USE_NSIGHT
@@ -834,6 +840,10 @@ public:
         MPI_Allreduce(MPI_IN_PLACE, &is_sym, 1, MPI_CXX_BOOL, MPI_LAND,
                       col_comm_);
 
+#if defined(HAS_UM)
+        matrices_->H().H2D();
+#endif
+
         return is_sym;
     }
 
@@ -1038,17 +1048,23 @@ public:
 
         AllReduce(allreduce_backend, rsd + locked, unconverged,
                   getMPI_Type<Base<T>>(), MPI_SUM, row_comm_, mpi_wrapper_);
-        //  Base<T> *resid_h;
-        // dla_->retrieveResid(&resid_h, locked, unconverged);
+//  Base<T> *resid_h;
+// dla_->retrieveResid(&resid_h, locked, unconverged);
+#if defined(HAS_UM)
+        // rsd and the host pointer which are trying to retrieve are going to be
+        // the same in the Unified Memory case, therefore the sync is needed
+        matrices_->Resid().sync2Ptr(1, unconverged, locked);
+#else
         if (rsd != matrices_->Resid().ptr())
         {
             //	std::cout << "rsd != Resid().ptr()" << std::endl;
             matrices_->Resid().sync2Ptr(1, unconverged, locked);
         }
+#endif
+
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
-
         for (std::size_t i = 0; i < unconverged; ++i)
         {
             //    resid[i] = std::sqrt(resid_h[i]);
@@ -1102,18 +1118,30 @@ public:
 #ifdef USE_NSIGHT
         nvtxRangePushA("pgeqrf+pgqr");
 #endif
+
+#if defined(HAS_UM)
+        matrices_->C().sync2Ptr();
+#else
         if (C != matrices_->C().ptr())
         {
             matrices_->C().sync2Ptr();
         }
+#endif
+
         t_pgeqrf(N_, nevex, matrices_->C().ptr(), one, one, desc1D_Nxnevx_,
                  tau.get());
         t_pgqr(N_, nevex, nevex, matrices_->C().ptr(), one, one, desc1D_Nxnevx_,
                tau.get());
+
+#if defined(HAS_UM)
+        matrices_->C().syncFromPtr();
+#else
         if (C != matrices_->C().ptr())
         {
             matrices_->C().syncFromPtr();
         }
+#endif
+
 #ifdef USE_NSIGHT
         nvtxRangePop();
         nvtxRangePushA("memcpy");
@@ -1129,10 +1157,14 @@ public:
             std::cout << "ScaLAPACK is not available, use LAPACK Householder "
                          "QR instead"
                       << std::endl;
+#if defined(HAS_UM)
+        matrices_->C().sync2Ptr();
+#else
         if (C != matrices_->C().ptr())
         {
             matrices_->C().sync2Ptr();
         }
+#endif
 
         if (!alloc_)
         {
@@ -1349,10 +1381,14 @@ public:
         auto nevex = nev_ + nex_;
 
         std::vector<T> V2(N_ * (nev_ + nex_));
+#if defined(HAS_UM)
+        matrices_->C().sync2Ptr();
+#else
         if (C != matrices_->C().ptr())
         {
             matrices_->C().sync2Ptr();
         }
+#endif
 
         this->collecRedundantVecs(matrices_->C().ptr(), V2.data(), 0,
                                   nev_ + nex_);
@@ -1433,9 +1469,7 @@ public:
         v_1 = new Matrix<T>(matrix_mode, m_, numvec);
         v_2 = new Matrix<T>(matrix_mode, m_, numvec);
         v_w = new Matrix<T>(matrix_mode, n_, numvec);
-        // Dear Riccardo... the problem to me seems very easy and straight
-        // forward... you are providing the function un initialized memory and
-        // you are expecting to obtain a result out of it... how sweet
+
         // Memcpy(memcpy_mode[1], v_1->ptr(), C, m_ * numvec * sizeof(T));
         Memcpy(memcpy_mode[1], v_1->ptr(), C, m_ * numvec * sizeof(T));
 
@@ -1470,6 +1504,9 @@ public:
 
             // dla_->applyVec(v_1->ptr(), v_w->ptr(), numvec);
             dla_->applyVec(v_1, v_w, numvec);
+#if defined(HAS_UM)
+            v_w->D2H();
+#endif
             MPI_Allreduce(MPI_IN_PLACE, v_w->ptr(), n_ * numvec,
                           getMPI_Type<T>(), MPI_SUM, col_comm_);
             // AllReduce(allreduce_backend, v_w->ptr(), n_ * numvec,
