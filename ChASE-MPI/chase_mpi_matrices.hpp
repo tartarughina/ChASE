@@ -400,7 +400,7 @@ public:
 
     void D2H(std::size_t nrows, std::size_t ncols, std::size_t offset = 0)
     {
-        this->Sync2Ptr(nrows, ncols, offset);
+        this->sync2Ptr(nrows, ncols, offset);
     }
 #endif
 
