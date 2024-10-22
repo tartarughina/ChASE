@@ -5,6 +5,10 @@
 // License is 3-clause BSD:
 // https://github.com/ChASE-library/ChASE
 
+#ifdef HAS_UM
+#include <cuda_runtime.h>
+#endif
+
 namespace chase
 {
 
