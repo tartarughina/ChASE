@@ -1155,7 +1155,7 @@ public:
         if (!alloc_)
         {
             V___ = std::make_unique<Matrix<T>>(
-                matrices_->matrices_->get_Mode() == 3 ? 3 : 0, N_, nevex);
+                matrices_->get_Mode() == 3 ? 3 : 0, N_, nevex);
             alloc_ = true;
         }
 
