@@ -202,6 +202,17 @@ public:
     {
         switch (mode)
         {
+#if defined(HAS_UM)
+            case 0:
+            case 1:
+            case 2:
+            case 3: // Unified Memory
+                Host_ = std::make_shared<UnifiedMem<T>>(m * n);
+                Device_ = Host_;
+                isHostAlloc_ = false;
+                isDeviceAlloc_ = true;
+                break;
+#else
             case 0: // CPU
                 Host_ = std::make_shared<CpuMem<T>>(m * n);
                 isHostAlloc_ = true;
@@ -219,13 +230,6 @@ public:
                 isHostAlloc_ = false;
                 isDeviceAlloc_ = true;
                 break;
-#if defined(HAS_UM)
-            case 3: // Unified Memory
-                Host_ = std::make_shared<UnifiedMem<T>>(m * n);
-                Device_ = Host_;
-                isHostAlloc_ = false;
-                isDeviceAlloc_ = true;
-                break;
 #endif
 #endif
         }
@@ -236,6 +240,19 @@ public:
     {
         switch (mode)
         {
+#if defined(HAS_UM)
+            case 0:
+            case 1:
+            case 2:
+            case 3:
+                Host_ = std::make_shared<UnifiedMem<T>>(ptr, ld * n);
+                Device_ = Host_;
+                // Match m with ld as m may differ from ld
+                m_ = ld;
+                isHostAlloc_ = true;
+                isDeviceAlloc_ = true;
+                break;
+#else
             case 0:
                 Host_ = std::make_shared<CpuMem<T>>(ptr, ld * n);
                 isHostAlloc_ = true;
@@ -251,15 +268,6 @@ public:
             case 2:
                 Host_ = std::make_shared<CpuMem<T>>(ptr, ld * n);
                 Device_ = std::make_shared<GpuMem<T>>(m * n);
-                isHostAlloc_ = true;
-                isDeviceAlloc_ = true;
-                break;
-#if defined(HAS_UM)
-            case 3:
-                Host_ = std::make_shared<UnifiedMem<T>>(ptr, ld * n);
-                Device_ = Host_;
-                // Match m with ld as m may differ from ld
-                m_ = ld;
                 isHostAlloc_ = true;
                 isDeviceAlloc_ = true;
                 break;
