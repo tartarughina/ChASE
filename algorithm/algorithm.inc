@@ -401,7 +401,7 @@ void Algorithm<T>::solve(Chase<T>* single)
     bool random = !config.UseApprox();
     single->initVecs(random);
     if(random)
-    {   
+    {
          single->QR(0, 1.0);
     }
     // --------------------------------- LANCZOS
@@ -413,6 +413,9 @@ void Algorithm<T>::solve(Chase<T>* single)
         lanczos(single, N, num_lanczos,
                 std::min(nevex, std::min(N / 2, config.GetLanczosIter())),
                 nevex, &upperb, random, random ? ritzv : NULL);
+#ifdef HAS_UM
+    cudaDeviceSynchronize();
+#endif
 #ifdef USE_NSIGHT
     nvtxRangePop();
 #endif
@@ -465,6 +468,9 @@ void Algorithm<T>::solve(Chase<T>* single)
         last_degree = degrees[0];
         if (config.DoOptimization() && iteration != 0)
         {
+#ifdef HAS_UM
+            cudaDeviceSynchronize();
+#endif
             deg = calc_degrees(single, N, unconverged, nex, upperb, lowerb, tol,
                                ritzv, resid, residLast, degrees, locked);
         }
@@ -497,6 +503,9 @@ void Algorithm<T>::solve(Chase<T>* single)
         Base<T> ee = (upperb - lowerb) / 2; // Half-length of the interval.
         Base<T> rho_1, rho_k;
         Base<T> t_1, t_k;
+#ifdef HAS_UM
+        cudaDeviceSynchronize();
+#endif
         t_1 = (single->GetRitzv()[0] - cc) / ee;
         t_k = (ritzv[0] - cc) / ee;
         rho_1 = std::max(std::abs(t_1 - std::sqrt(t_1 * t_1 - 1)),
@@ -511,6 +520,9 @@ void Algorithm<T>::solve(Chase<T>* single)
                       degrees[0]));
 
         single->QR(locked, cond);
+#ifdef HAS_UM
+        cudaDeviceSynchronize();
+#endif
 #ifdef USE_NSIGHT
         nvtxRangePop();
         nvtxRangePushA("RR");
@@ -518,6 +530,9 @@ void Algorithm<T>::solve(Chase<T>* single)
         // ----------------------------- RAYLEIGH  RITZ
         // ----------------------------
         single->RR(ritzv, unconverged);
+#ifdef HAS_UM
+        cudaDeviceSynchronize();
+#endif
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
@@ -529,6 +544,9 @@ void Algorithm<T>::solve(Chase<T>* single)
         for (auto i = 0; i < unconverged; ++i)
             residLast[i] = std::min(residLast[i], resid[i]);
         single->Resd(ritzv, resid, locked);
+#ifdef HAS_UM
+        cudaDeviceSynchronize();
+#endif
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
@@ -556,6 +574,9 @@ void Algorithm<T>::solve(Chase<T>* single)
     nvtxRangePushA("Sort");
 #endif
     //---------------------SORT-EIGENPAIRS-ACCORDING-TO-EIGENVALUES---------------
+#ifdef HAS_UM
+    cudaDeviceSynchronize();
+#endif
     for (auto i = 0; i < nev - 1; ++i)
         for (auto j = i + 1; j < nev; ++j)
         {
