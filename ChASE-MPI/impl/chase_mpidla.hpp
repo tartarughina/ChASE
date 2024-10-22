@@ -186,7 +186,6 @@ public:
             c_lens.push_back(c_len);
         }
 
-
         if (isSameDist_)
         {
             for (auto i = 0; i < row_size_; i++)
@@ -313,7 +312,7 @@ public:
         vv = matrices_->vv_comm();
         rsd = matrices_->Resid_comm();
 
-        if (matrices_->get_Mode() == 2)
+        if (matrices_->get_Mode() == 2 || matrices_->get_Mode() == 3)
         {
             cuda_aware_ = true;
         }
@@ -344,24 +343,29 @@ public:
             bcast_backend = MPI_BACKEND;
         }
 
-        if(!isSameDist_){
+        if (!isSameDist_)
+        {
             auto max_c_len = *max_element(c_lens.begin(), c_lens.end());
-            if(cuda_aware_){
-                buff__ = std::make_unique<Matrix<T>>(2, max_c_len, nex_ + nev_);
-            }else{
-                buff__ = std::make_unique<Matrix<T>>(0, max_c_len, nex_ + nev_);                
+            if (cuda_aware_)
+            {
+                // Replace 2 with the get_Mode() function to handle also UM
+                buff__ = std::make_unique<Matrix<T>>(matrices_->get_Mode(),
+                                                     max_c_len, nex_ + nev_);
+            }
+            else
+            {
+                buff__ = std::make_unique<Matrix<T>>(0, max_c_len, nex_ + nev_);
             }
         }
 
-        //std::cout << "numbvecs = " << config_->GetNumLanczos() << std::endl;
+        // std::cout << "numbvecs = " << config_->GetNumLanczos() << std::endl;
 
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
     }
 
-    ~ChaseMpiDLA()
-    {}
+    ~ChaseMpiDLA() {}
 
     //! In ChaseMpiDLA, this function consists of operations
     /*!
@@ -428,6 +432,11 @@ public:
 #endif
         next_ = NextOp::bAc;
         locked_ = locked;
+
+#if defined(HAS_UM)
+        // Be sure that the device is not using C before copying into it
+        cudaDeviceSynchronize();
+#endif
 
         // T *C_host;
         // dla_->retrieveC(&C_host, locked, block, false);
@@ -691,24 +700,31 @@ public:
         }
         else
         {
-            for(auto i = 0; i < c_lens.size(); i++){
-                if (row_rank_ == c_dests[i]){
-                    //pack
-                    dla_->lacpy('A', c_lens[i], block, C2 + c_disps[i] + locked * send_lens_[0][col_rank_], send_lens_[0][col_rank_],
-                                buff__.get()->ptr(), c_lens[i]);
+            for (auto i = 0; i < c_lens.size(); i++)
+            {
+                if (row_rank_ == c_dests[i])
+                {
+                    // pack
+                    dla_->lacpy('A', c_lens[i], block,
+                                C2 + c_disps[i] +
+                                    locked * send_lens_[0][col_rank_],
+                                send_lens_[0][col_rank_], buff__.get()->ptr(),
+                                c_lens[i]);
 
-                    Bcast(bcast_backend, buff__.get()->ptr(), c_lens[i] * block, getMPI_Type<T>(), c_srcs[i], col_comm_, mpi_wrapper_);
+                    Bcast(bcast_backend, buff__.get()->ptr(), c_lens[i] * block,
+                          getMPI_Type<T>(), c_srcs[i], col_comm_, mpi_wrapper_);
 
-                    //unpack
-                    dla_->lacpy('A', c_lens[i], block, buff__.get()->ptr(), c_lens[i], B2 + b_disps[i] + locked * n_, n_);
+                    // unpack
+                    dla_->lacpy('A', c_lens[i], block, buff__.get()->ptr(),
+                                c_lens[i], B2 + b_disps[i] + locked * n_, n_);
                 }
             }
         }
-            
-	dla_->asynCxHGatherC(locked, block, isCcopied);
+
+        dla_->asynCxHGatherC(locked, block, isCcopied);
 
         AllReduce(allreduce_backend, B + locked * n_, dim, getMPI_Type<T>(),
-                   MPI_SUM, col_comm_, mpi_wrapper_);
+                  MPI_SUM, col_comm_, mpi_wrapper_);
 
 #ifdef USE_NSIGHT
         nvtxRangePop();
@@ -751,10 +767,9 @@ public:
           - `ChaseMpiDLA::apply(One, Zero, 0, 1, 0)`
           - `ChaseMpiDLA::postApplication(C, 1, 0)`
     */
-    void applyVec(T* v, T* v2, std::size_t n) override
-    {}
+    void applyVec(T* v, T* v2, std::size_t n) override {}
 
-    bool checkSymmetryEasy() override 
+    bool checkSymmetryEasy() override
     {
         std::vector<T> v(m_, T(0.0));
         std::vector<T> u(n_, T(0.0));
@@ -766,62 +781,72 @@ public:
 
         std::mt19937 gen(1337.0 + mpi_col_rank);
         std::normal_distribution<> d;
-        
+
         for (auto i = 0; i < m_; i++)
         {
             v[i] = getRandomT<T>([&]() { return d(gen); });
         }
 
         this->C2B(v.data(), 0, v_2.data(), 0, 1);
-        
+
         T One = T(1.0);
         T Zero = T(0.0);
 
-        t_gemm(CblasColMajor, CblasConjTrans, CblasNoTrans, //
-               n_, 1, m_,                                 //
-               &One,                                      //
-               matrices_->H().host(), matrices_->H().h_ld(),                                  //
-               v.data(), m_,                             //
-               &Zero,                                     //
+#if defined(HAS_UM)
+        matrices_->H().D2H();
+#endif
+
+        t_gemm(CblasColMajor, CblasConjTrans, CblasNoTrans,  //
+               n_, 1, m_,                                    //
+               &One,                                         //
+               matrices_->H().host(), matrices_->H().h_ld(), //
+               v.data(), m_,                                 //
+               &Zero,                                        //
                u.data(), n_);
 
-        MPI_Allreduce(MPI_IN_PLACE, u.data(), n_,
-                      getMPI_Type<T>(), MPI_SUM, col_comm_);  
+        MPI_Allreduce(MPI_IN_PLACE, u.data(), n_, getMPI_Type<T>(), MPI_SUM,
+                      col_comm_);
 
-        t_gemm(CblasColMajor, CblasNoTrans, CblasNoTrans, //
-               m_, 1, n_,                                 //
-               &One,                                      //
-               matrices_->H().host(), matrices_->H().h_ld(),                                  //
-               v_2.data(), n_,                             //
-               &Zero,                                     //
+        t_gemm(CblasColMajor, CblasNoTrans, CblasNoTrans,    //
+               m_, 1, n_,                                    //
+               &One,                                         //
+               matrices_->H().host(), matrices_->H().h_ld(), //
+               v_2.data(), n_,                               //
+               &Zero,                                        //
                uT.data(), m_);
 
-        MPI_Allreduce(MPI_IN_PLACE, uT.data(), m_,
-                      getMPI_Type<T>(), MPI_SUM, row_comm_);  
+        MPI_Allreduce(MPI_IN_PLACE, uT.data(), m_, getMPI_Type<T>(), MPI_SUM,
+                      row_comm_);
 
         this->B2C(u.data(), 0, v.data(), 0, 1);
 
         bool is_sym = true;
 
-        for(auto i = 0; i < m_; i++)
+        for (auto i = 0; i < m_; i++)
         {
-            //std::cout << "std::abs(v[i] - uT[i]) = " << std::abs(v[i] - uT[i]) << "\n";
-            //if(std::abs(v[i] - uT[i]) > std::numeric_limits<Base<T>>::epsilon())
-            if(std::abs(v[i] - uT[i]) > 1e-10)
+            // std::cout << "std::abs(v[i] - uT[i]) = " << std::abs(v[i] -
+            // uT[i]) << "\n"; if(std::abs(v[i] - uT[i]) >
+            // std::numeric_limits<Base<T>>::epsilon())
+            if (std::abs(v[i] - uT[i]) > 1e-10)
             {
-                 is_sym = false;
+                is_sym = false;
                 break;
             }
         }
 
-        MPI_Allreduce(MPI_IN_PLACE, &is_sym, 1, MPI_CXX_BOOL, MPI_LAND, col_comm_);
+        MPI_Allreduce(MPI_IN_PLACE, &is_sym, 1, MPI_CXX_BOOL, MPI_LAND,
+                      col_comm_);
+
+#if defined(HAS_UM)
+        matrices_->H().H2D();
+#endif
 
         return is_sym;
     }
 
     void symOrHermMatrix(char uplo) override
     {
-#if defined(HAS_SCALAPACK)    
+#if defined(HAS_SCALAPACK)
         auto ctxt = matrix_properties_->get_comm2D_ctxt();
         std::size_t desc_H[9];
         int info;
@@ -830,38 +855,53 @@ public:
         auto ldh = matrices_->H().h_ld();
         auto H = matrices_->H().host();
 
-        t_descinit(desc_H, &N_, &N_, &mb_, &nb_, &zero, &zero, &ctxt, &ldh, &info);  
+        t_descinit(desc_H, &N_, &N_, &mb_, &nb_, &zero, &zero, &ctxt, &ldh,
+                   &info);
 
-        if(uplo == 'U')
+        if (uplo == 'U')
         {
-            for(std::size_t j = 0; j < nblocks_; j++){
-                for(std::size_t i = 0; i < mblocks_; i++){
-                    for(std::size_t q = 0; q < c_lens_[j]; q++){
-                        for(std::size_t p = 0; p < r_lens_[i]; p++){
-                            if(q + c_offs_[j] == p + r_offs_[i]){
-                                H[(q + c_offs_l_[j]) * ldh + p + r_offs_l_[i]] *= T(0.5);
-                            }
-                            else if(q + c_offs_[j] < p + r_offs_[i])
+            for (std::size_t j = 0; j < nblocks_; j++)
+            {
+                for (std::size_t i = 0; i < mblocks_; i++)
+                {
+                    for (std::size_t q = 0; q < c_lens_[j]; q++)
+                    {
+                        for (std::size_t p = 0; p < r_lens_[i]; p++)
+                        {
+                            if (q + c_offs_[j] == p + r_offs_[i])
                             {
-                                H[(q + c_offs_l_[j]) * ldh + p + r_offs_l_[i]] = T(0.0);
+                                H[(q + c_offs_l_[j]) * ldh + p +
+                                  r_offs_l_[i]] *= T(0.5);
+                            }
+                            else if (q + c_offs_[j] < p + r_offs_[i])
+                            {
+                                H[(q + c_offs_l_[j]) * ldh + p + r_offs_l_[i]] =
+                                    T(0.0);
                             }
                         }
                     }
                 }
             }
-
-        }else
+        }
+        else
         {
-            for(std::size_t j = 0; j < nblocks_; j++){
-                for(std::size_t i = 0; i < mblocks_; i++){
-                    for(std::size_t q = 0; q < c_lens_[j]; q++){
-                        for(std::size_t p = 0; p < r_lens_[i]; p++){
-                            if(q + c_offs_[j] == p + r_offs_[i]){
-                                H[(q + c_offs_l_[j]) * ldh + p + r_offs_l_[i]] *= T(0.5);
-                            }
-                            else if(q + c_offs_[j] > p + r_offs_[i])
+            for (std::size_t j = 0; j < nblocks_; j++)
+            {
+                for (std::size_t i = 0; i < mblocks_; i++)
+                {
+                    for (std::size_t q = 0; q < c_lens_[j]; q++)
+                    {
+                        for (std::size_t p = 0; p < r_lens_[i]; p++)
+                        {
+                            if (q + c_offs_[j] == p + r_offs_[i])
                             {
-                                H[(q + c_offs_l_[j]) * ldh + p + r_offs_l_[i]] = T(0.0);
+                                H[(q + c_offs_l_[j]) * ldh + p +
+                                  r_offs_l_[i]] *= T(0.5);
+                            }
+                            else if (q + c_offs_[j] > p + r_offs_[i])
+                            {
+                                H[(q + c_offs_l_[j]) * ldh + p + r_offs_l_[i]] =
+                                    T(0.0);
                             }
                         }
                     }
@@ -870,21 +910,23 @@ public:
         }
         T One = T(1.0);
         T Zero = T(0.0);
-        std::vector<T> tmp(m_ * (n_+2*nb_));
-        t_ptranc(N_, N_, One, H, one, one, desc_H, Zero, tmp.data(), one, one, desc_H);
+        std::vector<T> tmp(m_ * (n_ + 2 * nb_));
+        t_ptranc(N_, N_, One, H, one, one, desc_H, Zero, tmp.data(), one, one,
+                 desc_H);
 
-        for(auto i = 0; i < m_; i++)
+        for (auto i = 0; i < m_; i++)
         {
-            for(auto j = 0; j < n_; j++)
+            for (auto j = 0; j < n_; j++)
             {
                 H[i + j * ldh] += tmp[i + j * m_];
             }
         }
-        
-    #else
-        std::cout << "!!! symmetrizeOrHermitianizeMatrix failed, it requires ScaLAPACK, which is not detected\n";
+
+#else
+        std::cout << "!!! symmetrizeOrHermitianizeMatrix failed, it requires "
+                     "ScaLAPACK, which is not detected\n";
         return;
-    #endif        
+#endif
     }
 
     int get_nprocs() const override { return matrix_properties_->get_nprocs(); }
@@ -1001,13 +1043,17 @@ public:
 
         AllReduce(allreduce_backend, rsd + locked, unconverged,
                   getMPI_Type<Base<T>>(), MPI_SUM, row_comm_, mpi_wrapper_);
-        //  Base<T> *resid_h;
-        // dla_->retrieveResid(&resid_h, locked, unconverged);
+//  Base<T> *resid_h;
+// dla_->retrieveResid(&resid_h, locked, unconverged);
+#if defined(HAS_UM)
+        matrices_->Resid().sync2Ptr(1, unconverged, locked);
+#else
         if (rsd != matrices_->Resid().ptr())
         {
             //	std::cout << "rsd != Resid().ptr()" << std::endl;
             matrices_->Resid().sync2Ptr(1, unconverged, locked);
         }
+#endif
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
@@ -1032,7 +1078,8 @@ public:
             - cuSOLVER zcusolverDnXpotrfz for multi-GPU distributed-memory
        ChASE, and it is implemented in ChaseMpiDLABlaslapack
     */
-    int potrf(char uplo, std::size_t n, T* a, std::size_t lda, bool isinfo = true) override    
+    int potrf(char uplo, std::size_t n, T* a, std::size_t lda,
+              bool isinfo = true) override
     {
         return dla_->potrf(uplo, n, a, lda);
     }
@@ -1064,6 +1111,9 @@ public:
 #ifdef USE_NSIGHT
         nvtxRangePushA("pgeqrf+pgqr");
 #endif
+#if defined(HAS_UM)
+        matrices_->C().sync2Ptr();
+#endif
         if (C != matrices_->C().ptr())
         {
             matrices_->C().sync2Ptr();
@@ -1072,6 +1122,9 @@ public:
                  tau.get());
         t_pgqr(N_, nevex, nevex, matrices_->C().ptr(), one, one, desc1D_Nxnevx_,
                tau.get());
+#if defined(HAS_UM)
+        matrices_->C().syncFromPtr();
+#endif
         if (C != matrices_->C().ptr())
         {
             matrices_->C().syncFromPtr();
@@ -1091,6 +1144,9 @@ public:
             std::cout << "ScaLAPACK is not available, use LAPACK Householder "
                          "QR instead"
                       << std::endl;
+#if defined(HAS_UM)
+        matrices_->C().sync2Ptr();
+#endif
         if (C != matrices_->C().ptr())
         {
             matrices_->C().sync2Ptr();
@@ -1098,7 +1154,8 @@ public:
 
         if (!alloc_)
         {
-            V___ = std::make_unique<Matrix<T>>(0, N_, nevex);
+            V___ = std::make_unique<Matrix<T>>(
+                matrices_->getMode() == 3 ? 3 : 0, N_, nevex);
             alloc_ = true;
         }
 
@@ -1150,7 +1207,7 @@ public:
         MPI_Comm_rank(MPI_COMM_WORLD, &grank);
 
         auto nevex = nev_ + nex_;
-        bool first_iter = !cuda_aware_;        
+        bool first_iter = !cuda_aware_;
         T one = T(1.0);
         T zero = T(0.0);
         int info = 1;
@@ -1159,23 +1216,25 @@ public:
                      first_iter);
         AllReduce(allreduce_backend, A, nevex * nevex, getMPI_Type<T>(),
                   MPI_SUM, col_comm_, mpi_wrapper_);
-        info = dla_->potrf('U', nevex, A, nevex, true); 
+        info = dla_->potrf('U', nevex, A, nevex, true);
 
-        if(info != 0)
+        if (info != 0)
         {
             return info;
-        }else
+        }
+        else
         {
             dla_->trsm('R', 'U', 'N', 'N', m_, nevex, &one, A, nevex, C, m_,
-                    false);
+                       false);
 #ifdef CHASE_OUTPUT
             if (grank == 0)
             {
-                std::cout << std::setprecision(2) << "choldegree: 1" << std::endl;
+                std::cout << std::setprecision(2) << "choldegree: 1"
+                          << std::endl;
             }
-#endif                    
-            return info;  
-        }                 
+#endif
+            return info;
+        }
     }
 
     int cholQR2(std::size_t locked) override
@@ -1185,8 +1244,8 @@ public:
         int grank;
         MPI_Comm_rank(MPI_COMM_WORLD, &grank);
 
-        auto nevex = nev_ + nex_; 
-        bool first_iter = !cuda_aware_;        
+        auto nevex = nev_ + nex_;
+        bool first_iter = !cuda_aware_;
         T one = T(1.0);
         T zero = T(0.0);
         int info = 1;
@@ -1196,46 +1255,48 @@ public:
 
         AllReduce(allreduce_backend, A, nevex * nevex, getMPI_Type<T>(),
                   MPI_SUM, col_comm_, mpi_wrapper_);
-        info = dla_->potrf('U', nevex, A, nevex, true); 
+        info = dla_->potrf('U', nevex, A, nevex, true);
 
-        if(info != 0)
+        if (info != 0)
         {
             return info;
-        }else
+        }
+        else
         {
             dla_->trsm('R', 'U', 'N', 'N', m_, nevex, &one, A, nevex, C, m_,
-                    true);
+                       true);
 
             dla_->syherk('U', 'C', nevex, m_, &one, C, m_, &zero, A, nevex,
-                    false);                    
+                         false);
 
             AllReduce(allreduce_backend, A, nevex * nevex, getMPI_Type<T>(),
-                  MPI_SUM, col_comm_, mpi_wrapper_);
-            
-            info = dla_->potrf('U', nevex, A, nevex, false); 
+                      MPI_SUM, col_comm_, mpi_wrapper_);
+
+            info = dla_->potrf('U', nevex, A, nevex, false);
 
             dla_->trsm('R', 'U', 'N', 'N', m_, nevex, &one, A, nevex, C, m_,
-                    false);
+                       false);
 #ifdef CHASE_OUTPUT
             if (grank == 0)
             {
-                std::cout << std::setprecision(2) << "choldegree: 2" << std::endl;
+                std::cout << std::setprecision(2) << "choldegree: 2"
+                          << std::endl;
             }
-#endif 
-            return info;  
+#endif
+            return info;
         }
-    }    
+    }
 
     int shiftedcholQR2(std::size_t locked) override
     {
         isHHqr = false;
-    
+
         int grank;
         MPI_Comm_rank(MPI_COMM_WORLD, &grank);
 
         Base<T> shift;
-        auto nevex = nev_ + nex_; 
-        bool first_iter = !cuda_aware_;        
+        auto nevex = nev_ + nex_;
+        bool first_iter = !cuda_aware_;
         T one = T(1.0);
         T zero = T(0.0);
         int info = 1;
@@ -1245,62 +1306,57 @@ public:
 
         AllReduce(allreduce_backend, A, nevex * nevex, getMPI_Type<T>(),
                   MPI_SUM, col_comm_, mpi_wrapper_);
-        
+
         Base<T> nrmf = 0.0;
         dla_->computeDiagonalAbsSum(A, &nrmf, nevex, nevex);
-        //Base<T> nrmf = dla_->nrm2(m_ * nevex, C, 1);
-        //nrmf = std::pow(nrmf, 2);
-        //MPI_Allreduce(MPI_IN_PLACE, &nrmf, 1, getMPI_Type<Base<T>>(),
-        //                MPI_SUM, col_comm_);
+        // Base<T> nrmf = dla_->nrm2(m_ * nevex, C, 1);
+        // nrmf = std::pow(nrmf, 2);
+        // MPI_Allreduce(MPI_IN_PLACE, &nrmf, 1, getMPI_Type<Base<T>>(),
+        //                 MPI_SUM, col_comm_);
 
         shift = std::sqrt(N_) * nrmf * std::numeric_limits<Base<T>>::epsilon();
 
         dla_->shiftMatrixForQR(A, nevex, (T)shift);
-        
-        info = dla_->potrf('U', nevex, A, nevex, true);        
-	
-        if(info != 0)
-	    {
-	        return info;
-	    }
 
-        
-        dla_->trsm('R', 'U', 'N', 'N', m_, nevex, &one, A, nevex, C, m_,
-                    true);
-            
-        dla_->syherk('U', 'C', nevex, m_, &one, C, m_, &zero, A, nevex,
-                    false);
-
-        AllReduce(allreduce_backend, A, nevex * nevex, getMPI_Type<T>(),
-                MPI_SUM, col_comm_, mpi_wrapper_);
-        
-        //check info after this step
         info = dla_->potrf('U', nevex, A, nevex, true);
-        if(info != 0)
-	{
-	    return info;
-	}
 
-        dla_->trsm('R', 'U', 'N', 'N', m_, nevex, &one, A, nevex, C, m_,
-                    true);
+        if (info != 0)
+        {
+            return info;
+        }
 
-        dla_->syherk('U', 'C', nevex, m_, &one, C, m_, &zero, A, nevex,
-                    false);
+        dla_->trsm('R', 'U', 'N', 'N', m_, nevex, &one, A, nevex, C, m_, true);
+
+        dla_->syherk('U', 'C', nevex, m_, &one, C, m_, &zero, A, nevex, false);
 
         AllReduce(allreduce_backend, A, nevex * nevex, getMPI_Type<T>(),
-                MPI_SUM, col_comm_, mpi_wrapper_);
-    
-        dla_->potrf('U', nevex, A, nevex, false); 
+                  MPI_SUM, col_comm_, mpi_wrapper_);
 
-        dla_->trsm('R', 'U', 'N', 'N', m_, nevex, &one, A, nevex, C, m_,
-                    false);
+        // check info after this step
+        info = dla_->potrf('U', nevex, A, nevex, true);
+        if (info != 0)
+        {
+            return info;
+        }
+
+        dla_->trsm('R', 'U', 'N', 'N', m_, nevex, &one, A, nevex, C, m_, true);
+
+        dla_->syherk('U', 'C', nevex, m_, &one, C, m_, &zero, A, nevex, false);
+
+        AllReduce(allreduce_backend, A, nevex * nevex, getMPI_Type<T>(),
+                  MPI_SUM, col_comm_, mpi_wrapper_);
+
+        dla_->potrf('U', nevex, A, nevex, false);
+
+        dla_->trsm('R', 'U', 'N', 'N', m_, nevex, &one, A, nevex, C, m_, false);
 
 #ifdef CHASE_OUTPUT
         if (grank == 0)
         {
-            std::cout << std::setprecision(2) << "choldegree: 2, shift = " << shift << std::endl;
+            std::cout << std::setprecision(2)
+                      << "choldegree: 2, shift = " << shift << std::endl;
         }
-#endif 
+#endif
 
         return info;
     }
@@ -1312,19 +1368,23 @@ public:
         auto nevex = nev_ + nex_;
 
         std::vector<T> V2(N_ * (nev_ + nex_));
+#if defined(HAS_UM)
+        matrices_->C().sync2Ptr();
+#else
         if (C != matrices_->C().ptr())
         {
             matrices_->C().sync2Ptr();
         }
-            
+#endif
+
         this->collecRedundantVecs(matrices_->C().ptr(), V2.data(), 0,
-                                    nev_ + nex_);
+                                  nev_ + nex_);
         std::vector<Base<T>> S(nev_ + nex_ - locked);
         T* U;
         std::size_t ld = 1;
         T* Vt;
-        t_gesvd('N', 'N', N_, nev_ + nex_ - locked, V2.data() + N_ * locked,
-                N_, S.data(), U, ld, Vt, ld);
+        t_gesvd('N', 'N', N_, nev_ + nex_ - locked, V2.data() + N_ * locked, N_,
+                S.data(), U, ld, Vt, ld);
         std::vector<Base<T>> norms(nev_ + nex_ - locked);
         for (auto i = 0; i < nev_ + nex_ - locked; i++)
         {
@@ -1345,7 +1405,7 @@ public:
     {
         Memcpy(memcpy_mode[0], C, C2, locked * m_ * sizeof(T));
 
-        if(isHHqr)
+        if (isHHqr)
         {
             Memcpy(memcpy_mode[0], C2 + locked * m_, C + locked * m_,
                    (nev_ + nex_ - locked) * m_ * sizeof(T));
@@ -1374,11 +1434,11 @@ public:
     }
 
     void mLanczos(std::size_t M, int numvec, Base<T>* d, Base<T>* e,
-                 Base<T>* r_beta) override
+                  Base<T>* r_beta) override
     {
         bool is_second_system = false;
 
-        if(numvec == -1)
+        if (numvec == -1)
         {
             numvec = 1;
             is_second_system = true;
@@ -1386,31 +1446,31 @@ public:
         std::vector<Base<T>> real_alpha(numvec);
         std::vector<T> alpha(numvec, T(1.0));
         std::vector<T> beta(numvec, T(0.0));
-    
-	int matrix_mode = matrices_->get_Mode();
-	if(matrices_->get_Mode() == 2)
-	{
-	    matrix_mode = 1;
-	}	
+
+        int matrix_mode = matrices_->get_Mode();
+        if (matrices_->get_Mode() == 2)
+        {
+            matrix_mode = 1;
+        }
         v_0 = new Matrix<T>(matrix_mode, m_, numvec);
         v_1 = new Matrix<T>(matrix_mode, m_, numvec);
         v_2 = new Matrix<T>(matrix_mode, m_, numvec);
         v_w = new Matrix<T>(matrix_mode, n_, numvec);
 
-        //Memcpy(memcpy_mode[1], v_1->ptr(), C, m_ * numvec * sizeof(T));
+        // Memcpy(memcpy_mode[1], v_1->ptr(), C, m_ * numvec * sizeof(T));
         Memcpy(memcpy_mode[1], v_1->ptr(), C, m_ * numvec * sizeof(T));
 
         dla_->nrm2_batch(m_, v_1, 1, numvec, real_alpha.data());
 
-        for(auto i = 0; i < numvec; i++)
+        for (auto i = 0; i < numvec; i++)
         {
             real_alpha[i] = std::pow(real_alpha[i], 2);
         }
 
-        MPI_Allreduce(MPI_IN_PLACE, real_alpha.data(), numvec, getMPI_Type<Base<T>>(),
-                      MPI_SUM, col_comm_);
+        MPI_Allreduce(MPI_IN_PLACE, real_alpha.data(), numvec,
+                      getMPI_Type<Base<T>>(), MPI_SUM, col_comm_);
 
-        for(auto i = 0; i < numvec; i++)
+        for (auto i = 0; i < numvec; i++)
         {
             real_alpha[i] = std::sqrt(real_alpha[i]);
             alpha[i] = T(1 / real_alpha[i]);
@@ -1420,58 +1480,61 @@ public:
 
         for (std::size_t k = 0; k < M; k = k + 1)
         {
-            if(!is_second_system)
+            if (!is_second_system)
             {
-                for(auto i = 0; i < numvec; i++){
-                    Memcpy(memcpy_mode[2], C + k * m_, v_1->ptr() + i * m_, m_ * sizeof(T));
+                for (auto i = 0; i < numvec; i++)
+                {
+                    Memcpy(memcpy_mode[2], C + k * m_, v_1->ptr() + i * m_,
+                           m_ * sizeof(T));
                 }
             }
 
-            //dla_->applyVec(v_1->ptr(), v_w->ptr(), numvec);
+            // dla_->applyVec(v_1->ptr(), v_w->ptr(), numvec);
             dla_->applyVec(v_1, v_w, numvec);
-	    MPI_Allreduce(MPI_IN_PLACE, v_w->ptr(), n_ * numvec, getMPI_Type<T>(), MPI_SUM,
-                      col_comm_);            
-            //AllReduce(allreduce_backend, v_w->ptr(), n_ * numvec,
-            //          getMPI_Type<T>(), MPI_SUM, col_comm_, mpi_wrapper_);
-            //this->B2C(v_w->ptr(), 0, v_2->ptr(), 0, numvec);   
-            this->B2C(v_w->ptr(), 0, v_2->ptr(), 0, numvec);   
+            MPI_Allreduce(MPI_IN_PLACE, v_w->ptr(), n_ * numvec,
+                          getMPI_Type<T>(), MPI_SUM, col_comm_);
+            // AllReduce(allreduce_backend, v_w->ptr(), n_ * numvec,
+            //           getMPI_Type<T>(), MPI_SUM, col_comm_, mpi_wrapper_);
+            // this->B2C(v_w->ptr(), 0, v_2->ptr(), 0, numvec);
+            this->B2C(v_w->ptr(), 0, v_2->ptr(), 0, numvec);
 
             dla_->dot_batch(m_, v_1, 1, v_2, 1, alpha.data(), numvec);
-            for(auto i = 0; i < numvec; i++)
+            for (auto i = 0; i < numvec; i++)
             {
                 alpha[i] = -alpha[i];
             }
 
-            MPI_Allreduce(MPI_IN_PLACE, alpha.data(), numvec, getMPI_Type<T>(), MPI_SUM,
-                          col_comm_);
+            MPI_Allreduce(MPI_IN_PLACE, alpha.data(), numvec, getMPI_Type<T>(),
+                          MPI_SUM, col_comm_);
 
             dla_->axpy_batch(m_, alpha.data(), v_1, 1, v_2, 1, numvec);
-            for(auto i = 0; i < numvec; i++)
+            for (auto i = 0; i < numvec; i++)
             {
                 alpha[i] = -alpha[i];
             }
 
-            for(auto i = 0; i < numvec; i++)
+            for (auto i = 0; i < numvec; i++)
             {
                 d[k + M * i] = std::real(alpha[i]);
             }
 
-            if(k > 0){
-                for(auto i = 0; i < numvec; i++)
+            if (k > 0)
+            {
+                for (auto i = 0; i < numvec; i++)
                 {
                     beta[i] = T(-r_beta[i]);
                 }
                 dla_->axpy_batch(m_, beta.data(), v_0, 1, v_2, 1, numvec);
             }
 
-            for(auto i = 0; i < numvec; i++)
+            for (auto i = 0; i < numvec; i++)
             {
                 beta[i] = -beta[i];
             }
 
             dla_->nrm2_batch(m_, v_2, 1, numvec, r_beta);
 
-            for(auto i = 0; i < numvec; i++)
+            for (auto i = 0; i < numvec; i++)
             {
                 r_beta[i] = std::pow(r_beta[i], 2);
             }
@@ -1479,7 +1542,7 @@ public:
             MPI_Allreduce(MPI_IN_PLACE, r_beta, numvec, getMPI_Type<Base<T>>(),
                           MPI_SUM, col_comm_);
 
-            for(auto i = 0; i < numvec; i++)
+            for (auto i = 0; i < numvec; i++)
             {
                 r_beta[i] = std::sqrt(r_beta[i]);
                 beta[i] = T(1 / r_beta[i]);
@@ -1487,10 +1550,10 @@ public:
 
             if (k == M - 1)
                 break;
-            
+
             dla_->scal_batch(m_, beta.data(), v_2, 1, numvec);
 
-            for(auto i = 0; i < numvec; i++)
+            for (auto i = 0; i < numvec; i++)
             {
                 e[k + M * i] = r_beta[i];
             }
@@ -1498,9 +1561,9 @@ public:
             v_1->swap(*v_2);
         }
 
-        if(!is_second_system)
+        if (!is_second_system)
         {
-            Memcpy(memcpy_mode[2], C, v_1->ptr(), m_ * numvec * sizeof(T));  
+            Memcpy(memcpy_mode[2], C, v_1->ptr(), m_ * numvec * sizeof(T));
         }
     }
 
@@ -1539,12 +1602,11 @@ public:
                 t_lacpy('A', b_lens[i], block, B + off1 * n_ + b_disps_2[i], n_,
                         C + off1 * m_ + c_disps_2[i], m_);
             }
-        }        
-    
+        }
     }
 
     void B2C(Matrix<T>* B, std::size_t off1, Matrix<T>* C, std::size_t off2,
-                        std::size_t block) override
+             std::size_t block) override
     {
         if (isSameDist_)
         {
@@ -1556,13 +1618,12 @@ public:
                     {
                         Bcast(bcast_backend, B->ptr() + off1 * n_, block * n_,
                               getMPI_Type<T>(), i, row_comm_, mpi_wrapper_);
-
-                    }else
+                    }
+                    else
                     {
                         Bcast(bcast_backend, C->ptr() + off1 * m_, block * m_,
                               getMPI_Type<T>(), i, row_comm_, mpi_wrapper_);
-
-                    }    
+                    }
                 }
             }
 
@@ -1574,25 +1635,33 @@ public:
                                 C->ptr() + off1 * m_, m_);
                 }
             }
-        }else
+        }
+        else
         {
-            for(auto i = 0; i < b_lens.size(); i++){
-                if (col_rank_ == b_dests[i]){
-                    //pack
-                    dla_->lacpy('A', b_lens[i], block, B->ptr() + b_disps[i] + off1 * send_lens_[1][row_rank_], send_lens_[1][row_rank_],
-                                buff__.get()->ptr(), b_lens[i]);
+            for (auto i = 0; i < b_lens.size(); i++)
+            {
+                if (col_rank_ == b_dests[i])
+                {
+                    // pack
+                    dla_->lacpy('A', b_lens[i], block,
+                                B->ptr() + b_disps[i] +
+                                    off1 * send_lens_[1][row_rank_],
+                                send_lens_[1][row_rank_], buff__.get()->ptr(),
+                                b_lens[i]);
 
-                    Bcast(bcast_backend, buff__.get()->ptr(), b_lens[i] * block, getMPI_Type<T>(), b_srcs[i], row_comm_, mpi_wrapper_);
+                    Bcast(bcast_backend, buff__.get()->ptr(), b_lens[i] * block,
+                          getMPI_Type<T>(), b_srcs[i], row_comm_, mpi_wrapper_);
 
-                    //unpack
-                    dla_->lacpy('A', b_lens[i], block, buff__.get()->ptr(), b_lens[i], C->ptr() + c_disps[i] + off1 * m_, m_);
+                    // unpack
+                    dla_->lacpy('A', b_lens[i], block, buff__.get()->ptr(),
+                                b_lens[i], C->ptr() + c_disps[i] + off1 * m_,
+                                m_);
                 }
             }
-        }           
+        }
     }
 
-    void C2B(T* C, std::size_t off1, T* B, std::size_t off2,
-             std::size_t block)
+    void C2B(T* C, std::size_t off1, T* B, std::size_t off2, std::size_t block)
     {
         for (auto i = 0; i < c_lens.size(); i++)
         {
@@ -1627,7 +1696,6 @@ public:
                         B + off1 * n_ + b_disps_2[i], n_);
             }
         }
-        
     }
 
     void lacpy(char uplo, std::size_t m, std::size_t n, T* a, std::size_t lda,
@@ -1636,21 +1704,29 @@ public:
     }
 
     void shiftMatrixForQR(T* A, std::size_t n, T shift) override {}
-    void computeDiagonalAbsSum(T *A, Base<T> *sum, std::size_t n, std::size_t ld){}
+    void computeDiagonalAbsSum(T* A, Base<T>* sum, std::size_t n,
+                               std::size_t ld)
+    {
+    }
     ChaseMpiMatrices<T>* getChaseMatrices() override { return matrices_; }
 
-    void nrm2_batch(std::size_t n, Matrix<T>* x, std::size_t incx, int count, Base<T> *nrms) override
-    {}
-    void scal_batch(std::size_t N, T* a, Matrix<T>* x, std::size_t incx, int count) override
-    {}  
-    void applyVec(Matrix<T>* v, Matrix<T>* w, std::size_t n) override
-    {}  
+    void nrm2_batch(std::size_t n, Matrix<T>* x, std::size_t incx, int count,
+                    Base<T>* nrms) override
+    {
+    }
+    void scal_batch(std::size_t N, T* a, Matrix<T>* x, std::size_t incx,
+                    int count) override
+    {
+    }
+    void applyVec(Matrix<T>* v, Matrix<T>* w, std::size_t n) override {}
     void dot_batch(std::size_t n, Matrix<T>* x, std::size_t incx, Matrix<T>* y,
-          std::size_t incy, T *products, int count) override
-    {}
-    void axpy_batch(std::size_t N, T* alpha, Matrix<T>* x, std::size_t incx, Matrix<T>* y,
-              std::size_t incy, int count) override
-    {}
+                   std::size_t incy, T* products, int count) override
+    {
+    }
+    void axpy_batch(std::size_t N, T* alpha, Matrix<T>* x, std::size_t incx,
+                    Matrix<T>* y, std::size_t incy, int count) override
+    {
+    }
 
 private:
     enum NextOp
@@ -1765,16 +1841,16 @@ private:
     Comm_t mpi_wrapper_;
     bool cuda_aware_;
     T *C, *B, *A, *C2, *B2, *vv;
-    Matrix<T> *v_0, *v_1, *v_2, *v_w;
+    Matrix<T>*v_0, *v_1, *v_2, *v_w;
     Base<T>* rsd;
     int allreduce_backend, bcast_backend;
     int memcpy_mode[3];
 
     ChaseMpiMatrices<T>* matrices_;
 
-    //buff
+    // buff
     std::unique_ptr<Matrix<T>> buff__;
-    
+
 #if !defined(HAS_SCALAPACK)
     std::unique_ptr<Matrix<T>> V___;
     bool alloc_ = false;

@@ -1,6 +1,8 @@
 #pragma once
 #include <map>
 #if defined(HAS_NCCL)
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <nccl.h>
 #endif
 #include <mpi.h>
@@ -149,14 +151,32 @@ void Memcpy(int mode, void* dst, const void* src, std::size_t count)
             break;
 #if defined(CUDA_AWARE)
         case CPY_D2D:
+            // UM will still used D2D memcpy
             cudaMemcpy(dst, src, count, cudaMemcpyDeviceToDevice);
-            //cudaDeviceSynchronize();
+            // cudaDeviceSynchronize();
             break;
         case CPY_D2H:
+#if defined(HAS_UM)
+#if defined(HAS_TUNING)
+            cudaMemPrefetchAsync(src, count, -1, 0);
+#endif
+            cudaDeviceSynchronize();
+            std::memcpy(dst, src, count);
+#else
             cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost);
+#endif
             break;
         case CPY_H2D:
+#if defined(HAS_UM)
+            std::memcpy(dst, src, count);
+#if defined(HAS_TUNING)
+            int device;
+            cudaGetDevice(&device);
+            cudaMemPrefetchAsync(dst, count, device, 0);
+#endif
+#else
             cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice);
+#endif
             break;
 #endif
     }

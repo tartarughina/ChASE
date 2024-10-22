@@ -36,8 +36,24 @@ using namespace popl;
 std::size_t GetFileSize(std::string path_in)
 {
     std::ifstream file(path_in, std::ios::binary | std::ios::ate);
-    return file.tellg();
-}   
+    if (!file.is_open())
+    {
+        std::cerr << "Error: Could not open file " << path_in << std::endl;
+        return 0; // Or std::size_t(-1) if you want to signal an error
+                  // differently
+    }
+
+    std::size_t size = file.tellg();
+    if (size == static_cast<std::size_t>(-1))
+    {
+        std::cerr << "Error: Could not determine file size for " << path_in
+                  << std::endl;
+        return 0; // Or std::size_t(-1) if you want to signal an error
+                  // differently
+    }
+
+    return size;
+}
 
 struct ChASE_DriverProblemConfig
 {
@@ -181,13 +197,50 @@ int do_chase(ChASE_DriverProblemConfig& conf)
     auto ldh_ = N;
 #endif
 
+    T *V, *H;
+    Base<T>* Lambda;
+
+#ifdef HAS_UM
+    // std::cout << "using Unified Memory" << std::endl;
+    cudaMallocManaged((void**)&V, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H, ldh_ * n_ * sizeof(T));
+
+#ifdef HAS_TUNING
+    // std::cout << "tuning Unified Memory" << std::endl;
+    int device;
+    cudaGetDevice(&device);
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
+
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
+
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, device);
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
+
+#endif
+#else
     auto V__ = std::unique_ptr<T[]>(new T[m_ * (nev + nex)]);
     auto Lambda__ = std::unique_ptr<Base<T>[]>(new Base<T>[(nev + nex)]);
     auto H__ = std::unique_ptr<T[]>(new T[ldh_ * n_]);
 
-    T* V = V__.get();
-    Base<T>* Lambda = Lambda__.get();
-    T *H = H__.get();
+    V = V__.get();
+    Lambda = Lambda__.get();
+    H = H__.get();
+#endif
 
 #if defined(USE_MPI)
 #ifdef USE_BLOCK_CYCLIC
@@ -207,7 +260,6 @@ int do_chase(ChASE_DriverProblemConfig& conf)
     config.SetMaxDeg(maxDeg);
     config.SetMaxIter(maxIter);
 
-
     if (!sequence)
     {
         bgn = end = 1;
@@ -221,7 +273,6 @@ int do_chase(ChASE_DriverProblemConfig& conf)
             {
                 Lambda[j] = 0.0;
             }
-            
         }
         else
         {
@@ -268,95 +319,94 @@ int do_chase(ChASE_DriverProblemConfig& conf)
         nvtxRangePushA("MatrixIO");
 #endif
 
-	if(!isMatGen)
-	{
-            if (rank == 0)
-            	std::cout << "start reading matrix\n";
+        if (rank == 0)
+            std::cout << "start reading matrix\n";
 
-            std::ostringstream problem(std::ostringstream::ate);
-            if(sequence){
-            	if(legacy)
-            	{
-                    problem << path_in << "gmat  1 " << std::setw(2) << i << ".bin";
-            	}
-            	else
-            	{
-                	problem << path_in << "mat_" << spin << "_" << std::setfill('0')
-                        	<< std::setw(2) << kpoint << "_" << std::setfill('0')
-                        	<< std::setw(2) << i << ".bin";
-            	}
+        std::ostringstream problem(std::ostringstream::ate);
+        if (sequence)
+        {
+            if (legacy)
+            {
+                problem << path_in << "gmat  1 " << std::setw(2) << i << ".bin";
             }
             else
             {
-            	problem << path_in;
+                problem << path_in << "mat_" << spin << "_" << std::setfill('0')
+                        << std::setw(2) << kpoint << "_" << std::setfill('0')
+                        << std::setw(2) << i << ".bin";
             }
+        }
+        else
+        {
+            problem << path_in;
+        }
 
-            if (rank == 0)
-            	std::cout << "Reading matrix: "<< problem.str() << std::endl;
+        if (rank == 0)
+            std::cout << "Reading matrix: " << problem.str() << std::endl;
 
+        std::size_t file_size = GetFileSize(problem.str());
 
-	    std::size_t file_size = GetFileSize(problem.str());
-
-            //check the input file size
-            try
+        // check the input file size
+        try
+        {
+            if (N * N * sizeof(T) != file_size)
             {
-                if (N * N * sizeof(T) != file_size)
-                {
-                    throw std::logic_error(
-                        std::string("The given file : ") + problem.str() +
-                        std::string(" of size ") + std::to_string(file_size) +
-                        std::string(
-                        	" doesn't equals to the required size of matrix of size ") +
+                throw std::logic_error(
+                    std::string("The given file : ") + problem.str() +
+                    std::string(" of size ") + std::to_string(file_size) +
+                    std::string(" doesn't equals to the required size of "
+                                "matrix of size ") +
                     std::to_string(N * N * sizeof(T)));
-            	}
-           }
-           catch (std::exception& e)
-           {
-           	 std::cerr << "Caught " << typeid(e).name() << " : " << e.what()
-                    << std::endl;
-            	return 1;
-           }
+            }
+        }
+        catch (std::exception& e)
+        {
+            std::cerr << "Caught " << typeid(e).name() << " : " << e.what()
+                      << std::endl;
+            return 1;
+        }
+
 #ifdef USE_MPI
 #ifdef USE_BLOCK_CYCLIC
-	   props->readHamiltonianBlockCyclicDist(problem.str(), H);
+        props->readHamiltonianBlockCyclicDist(problem.str(), H);
 #else
-	   props->readHamiltonianBlockDist(problem.str(), H);	   
-#endif		
-#else
-           std::ifstream input(problem.str().c_str(), std::ios::binary);
-           if (input.is_open())
-           {
-                input.read((char*)H, sizeof(T) * N * N);
-           }
-           else
-           {
-                throw std::string("error reading file: ") + problem.str();
-           }
-#endif		
-	}
-	else
-	{
-#ifdef USE_BLOCK_CYCLIC
-	    std::cerr << 
-		"Generating test matrix on the fly is not supported for block-cyclic distribution implementation" 
-	    	<< std::endl;
-#else		
-            if (rank == 0)
-                std::cout << "start generating matrix\n";
-
-	    Base<T> epsilon = 1e-4;
+        if (isMatGen)
+        {
+            Base<T> epsilon = 1e-4;
             Base<T>* eigenv = new Base<T>[N];
-            for (std::size_t i = 0; i < ylen; i++) {
-                for (std::size_t j = 0; j < xlen; j++) {
-                    if (xoff + j == (i + yoff)) {
-                        H[i * xlen + j] =  dmax * (epsilon + (Base<T>)(xoff + j) * (1.0 - epsilon) / (Base<T>)N);
-                    }else{
+            for (std::size_t i = 0; i < ylen; i++)
+            {
+                for (std::size_t j = 0; j < xlen; j++)
+                {
+                    if (xoff + j == (i + yoff))
+                    {
+                        H[i * xlen + j] =
+                            dmax * (epsilon + (Base<T>)(xoff + j) *
+                                                  (1.0 - epsilon) / (Base<T>)N);
+                    }
+                    else
+                    {
                         H[i * xlen + j] = T(0.0);
                     }
                 }
             }
-#endif    	    
-	}
+        }
+        else
+        {
+            props->readHamiltonianBlockDist(problem.str(), H);
+        }
+#endif
+#else
+        std::ifstream input(problem.str().c_str(), std::ios::binary);
+        if (input.is_open())
+        {
+            input.read((char*)H, sizeof(T) * N * N);
+        }
+        else
+        {
+            throw std::string("error reading file: ") + problem.str();
+        }
+#endif
 
 #ifdef USE_MPI
         MPI_Barrier(MPI_COMM_WORLD);
@@ -370,12 +420,6 @@ int do_chase(ChASE_DriverProblemConfig& conf)
             std::cout << "matrix are loaded in " << elapsed.count()
                       << " seconds" << std::endl;
 
-
-        if(!single.checkSymmetryEasy())
-        {
-            single.symOrHermMatrix('L');
-        }
-        
 #ifdef USE_NSIGHT
         nvtxRangePop();
 #endif
@@ -383,9 +427,8 @@ int do_chase(ChASE_DriverProblemConfig& conf)
 #ifdef USE_MPI
         MPI_Barrier(MPI_COMM_WORLD);
 #endif
-
         chase::Solve(&performanceDecorator);
-        // chase::Solve(&single);
+// chase::Solve(&single);
 #ifdef USE_MPI
         MPI_Barrier(MPI_COMM_WORLD);
 #endif
@@ -417,6 +460,13 @@ int do_chase(ChASE_DriverProblemConfig& conf)
         }
     }
 
+#ifdef HAS_UM
+    /*Free the memory of the matrix*/
+    cudaFree(V);
+    cudaFree(H);
+    cudaFree(Lambda);
+#endif
+
     return 0;
 }
 
@@ -431,91 +481,141 @@ int main(int argc, char* argv[])
 
     popl::OptionParser desc("ChASE options");
     auto help_option = desc.add<Switch>("h", "help", "show this message");
-    desc.add<Value<std::size_t>, Attribute::required>("", "n", "Size of the Input Matrix", 0, &conf.N);
-    desc.add<Value<bool>>("", "double", "Is matrix double valued, false indicates the single type", true, &conf.isdouble);
-    desc.add<Value<bool>>("", "complex", "Matrix is complex, false indicated the real matrix", true, &conf.iscomplex);
-    desc.add<Value<std::size_t>, Attribute::required>("", "nev", "Wanted Number of Eigenpairs", 0, &conf.nev);
-    desc.add<Value<std::size_t>>("", "nex", "Extra Search Dimensions", 25, &conf.nex);
-    desc.add<Value<std::size_t>>("", "deg", "Initial filtering degree", 20, &conf.deg);
-    desc.add<Value<std::size_t>>("", "maxDeg", "Sets the maximum value of the degree of the Chebyshev filter", 36, &conf.maxDeg);
-    desc.add<Value<std::size_t>>("", "maxIter", "Sets the value of the maximum number of subspace iterations\nwithin ChASE", 25, &conf.maxIter);
+    desc.add<Value<std::size_t>, Attribute::required>(
+        "", "n", "Size of the Input Matrix", 0, &conf.N);
+    desc.add<Value<bool>>(
+        "", "double",
+        "Is matrix double valued, false indicates the single type", true,
+        &conf.isdouble);
+    desc.add<Value<bool>>("", "complex",
+                          "Matrix is complex, false indicated the real matrix",
+                          true, &conf.iscomplex);
+    desc.add<Value<std::size_t>, Attribute::required>(
+        "", "nev", "Wanted Number of Eigenpairs", 0, &conf.nev);
+    desc.add<Value<std::size_t>>("", "nex", "Extra Search Dimensions", 25,
+                                 &conf.nex);
+    desc.add<Value<std::size_t>>("", "deg", "Initial filtering degree", 20,
+                                 &conf.deg);
+    desc.add<Value<std::size_t>>(
+        "", "maxDeg",
+        "Sets the maximum value of the degree of the Chebyshev filter", 36,
+        &conf.maxDeg);
+    desc.add<Value<std::size_t>>("", "maxIter",
+                                 "Sets the value of the maximum number of "
+                                 "subspace iterations\nwithin ChASE",
+                                 25, &conf.maxIter);
     desc.add<Value<std::size_t>>("", "bgn", "Start ell", 2, &conf.bgn);
     desc.add<Value<std::size_t>>("", "end", "End ell", 2, &conf.end);
-	desc.add<Value<std::string>>("", "spin", "spin", "d", &conf.spin);
+    desc.add<Value<std::string>>("", "spin", "spin", "d", &conf.spin);
     desc.add<Value<std::size_t>>("", "kpoint", "kpoint", 0, &conf.kpoint);
-    desc.add<Value<double>>("", "tol", "Tolerance for Eigenpair convergence", 1e-10, &conf.tol);
-    auto path_in_options = desc.add<Value<std::string>, Attribute::required>("", "path_in", "Path to the input matrix/matrices", "d", &conf.path_in);
-    desc.add<Value<std::string>>("", "mode", "valid values are R(andom) or A(pproximate)", "A", &conf.mode);
-    desc.add<Value<std::string>>("", "opt", "Optimi(S)e degree, or do (N)ot optimise", "S", &conf.opt);
-    desc.add<Value<std::string>>("", "path_eigp", "Path to approximate solutions, only required when mode\nis Approximate, otherwise not used" , "", &conf.path_eigp);
-    desc.add<Value<bool>>("", "sequence", "Treat as sequence of Problems. Previous ChASE solution is used, when available", false, &conf.sequence);
-    desc.add<Value<std::size_t>>("", "lanczosIter", "Sets the number of Lanczos iterations executed by ChASE.", 25, &conf.lanczosIter);
-    desc.add<Value<std::size_t>>("", "numLanczos", "Sets the number of stochastic vectors used for the spectral estimates in Lanczos", 4, &conf.numLanczos);
-    auto isMatGen_options = desc.add<Value<bool>>("", "isMatGen", "generating a matrix in place", false, &conf.isMatGen);
-    desc.add<Value<double>>("", "dmax", "Tolerance for Eigenpair convergence", 100, &conf.dmax);
+    desc.add<Value<double>>("", "tol", "Tolerance for Eigenpair convergence",
+                            1e-10, &conf.tol);
+    auto path_in_options = desc.add<Value<std::string>, Attribute::required>(
+        "", "path_in", "Path to the input matrix/matrices", "d", &conf.path_in);
+    desc.add<Value<std::string>>("", "mode",
+                                 "valid values are R(andom) or A(pproximate)",
+                                 "A", &conf.mode);
+    desc.add<Value<std::string>>(
+        "", "opt", "Optimi(S)e degree, or do (N)ot optimise", "S", &conf.opt);
+    desc.add<Value<std::string>>(
+        "", "path_eigp",
+        "Path to approximate solutions, only required when mode\nis "
+        "Approximate, otherwise not used",
+        "", &conf.path_eigp);
+    desc.add<Value<bool>>("", "sequence",
+                          "Treat as sequence of Problems. Previous ChASE "
+                          "solution is used, when available",
+                          false, &conf.sequence);
+    desc.add<Value<std::size_t>>(
+        "", "lanczosIter",
+        "Sets the number of Lanczos iterations executed by ChASE.", 25,
+        &conf.lanczosIter);
+    desc.add<Value<std::size_t>>("", "numLanczos",
+                                 "Sets the number of stochastic vectors used "
+                                 "for the spectral estimates in Lanczos",
+                                 4, &conf.numLanczos);
+    auto isMatGen_options = desc.add<Value<bool>>(
+        "", "isMatGen", "generating a matrix in place", false, &conf.isMatGen);
+    desc.add<Value<double>>("", "dmax", "Tolerance for Eigenpair convergence",
+                            100, &conf.dmax);
 #ifdef USE_BLOCK_CYCLIC
-        desc.add<Value<std::size_t>>("", "mbsize", "block size for the row", 400, &conf.mbsize);
-        desc.add<Value<std::size_t>>("", "nbsize", "block size for the column", 400, &conf.nbsize);
-        desc.add<Value<int>>("", "dim0", "row number of MPI proc grid", 0, &conf.dim0);
-        desc.add<Value<int>>("", "dim1", "column number of MPI proc grid", 0, &conf.dim1);
-        desc.add<Value<int>>("", "irsrc", "The process row over which the first row of matrix is distributed.", 0, &conf.irsrc);
-        desc.add<Value<int>>("", "icsrc", "The process column over which the first column of the array A\nis\n distributed." , 0, &conf.icsrc);
-        desc.add<Value<std::string>>("", "major", "Major of MPI proc grid, valid values are R(ow) or C(olumn)" , "C", &conf.mode);
+    desc.add<Value<std::size_t>>("", "mbsize", "block size for the row", 400,
+                                 &conf.mbsize);
+    desc.add<Value<std::size_t>>("", "nbsize", "block size for the column", 400,
+                                 &conf.nbsize);
+    desc.add<Value<int>>("", "dim0", "row number of MPI proc grid", 0,
+                         &conf.dim0);
+    desc.add<Value<int>>("", "dim1", "column number of MPI proc grid", 0,
+                         &conf.dim1);
+    desc.add<Value<int>>(
+        "", "irsrc",
+        "The process row over which the first row of matrix is distributed.", 0,
+        &conf.irsrc);
+    desc.add<Value<int>>("", "icsrc",
+                         "The process column over which the first column of "
+                         "the array A\nis\n distributed.",
+                         0, &conf.icsrc);
+    desc.add<Value<std::string>>(
+        "", "major",
+        "Major of MPI proc grid, valid values are R(ow) or C(olumn)", "C",
+        &conf.mode);
 #endif
-    desc.add<Value<bool>>("", "legacy", "Use legacy naming scheme?", false, &conf.legacy);
+    desc.add<Value<bool>>("", "legacy", "Use legacy naming scheme?", false,
+                          &conf.legacy);
 
     try
-	{   
-		desc.parse(argc, argv);
+    {
+        desc.parse(argc, argv);
 
-		if (help_option->count() == 1)
-            {
-			std::cout << desc << "\n";
+        if (help_option->count() == 1)
+        {
+            std::cout << desc << "\n";
             return 0;
-            }
+        }
     }
-	catch (const popl::invalid_option& e)
-	{
+    catch (const popl::invalid_option& e)
+    {
         if (help_option->count() == 1)
         {
-			std::cout << desc << "\n";
+            std::cout << desc << "\n";
             return 0;
         }
-		std::cerr << "Invalid Option Exception: " << e.what() << "\n";
-		std::cerr << "error:  ";
-		if (e.error() == invalid_option::Error::missing_argument)
-			std::cerr << "missing_argument\n";
-		else if (e.error() == invalid_option::Error::invalid_argument)
-			std::cerr << "invalid_argument\n";
-		else if (e.error() == invalid_option::Error::too_many_arguments)
-			std::cerr << "too_many_arguments\n";
-		else if (e.error() == invalid_option::Error::missing_option)
-			std::cerr << "missing_option\n";
+        std::cerr << "Invalid Option Exception: " << e.what() << "\n";
+        std::cerr << "error:  ";
+        if (e.error() == invalid_option::Error::missing_argument)
+            std::cerr << "missing_argument\n";
+        else if (e.error() == invalid_option::Error::invalid_argument)
+            std::cerr << "invalid_argument\n";
+        else if (e.error() == invalid_option::Error::too_many_arguments)
+            std::cerr << "too_many_arguments\n";
+        else if (e.error() == invalid_option::Error::missing_option)
+            std::cerr << "missing_option\n";
 
-		if (e.error() == invalid_option::Error::missing_option)
-		{
-			std::string option_name(e.option()->name(OptionName::short_name, true));
-			if (option_name.empty())
-				option_name = e.option()->name(OptionName::long_name, true);
-			std::cerr << "option: " << option_name << "\n";
-		}
-		else
-		{
-			std::cerr << "option: " << e.option()->name(e.what_name()) << "\n";
-			std::cerr << "value:  " << e.value() << "\n";
-		}
-		return EXIT_FAILURE;
-	}
-	catch (const std::exception& e)
-	{
+        if (e.error() == invalid_option::Error::missing_option)
+        {
+            std::string option_name(
+                e.option()->name(OptionName::short_name, true));
+            if (option_name.empty())
+                option_name = e.option()->name(OptionName::long_name, true);
+            std::cerr << "option: " << option_name << "\n";
+        }
+        else
+        {
+            std::cerr << "option: " << e.option()->name(e.what_name()) << "\n";
+            std::cerr << "value:  " << e.value() << "\n";
+        }
+        return EXIT_FAILURE;
+    }
+    catch (const std::exception& e)
+    {
         if (help_option->count() == 1)
         {
-			std::cout << desc << "\n";
+            std::cout << desc << "\n";
             return 0;
         }
-		std::cerr << "Exception: " << e.what() << "\n";
-		return EXIT_FAILURE;
-	}
+        std::cerr << "Exception: " << e.what() << "\n";
+        return EXIT_FAILURE;
+    }
 
     conf.mode = toupper(conf.mode.at(0));
     conf.opt = toupper(conf.opt.at(0));
@@ -547,7 +647,8 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    if(conf.isMatGen){
+    if (conf.isMatGen)
+    {
         conf.iscomplex = false;
     }
 
@@ -570,6 +671,7 @@ int main(int argc, char* argv[])
 #ifdef USE_MPI
     MPI_Finalize();
 #else
+
     return 0;
 #endif
 }

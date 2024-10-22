@@ -73,12 +73,48 @@ int main(int argc, char** argv)
 
     auto m_ = props->get_m();
     auto n_ = props->get_n();
-    auto V = std::vector<T>(m_ * (nev + nex));     // eigevectors
-    auto Lambda = std::vector<Base<T>>(nev + nex); // eigenvalues
     auto ldh_ = props->get_ldh();
-    auto H = std::vector<T>(ldh_ * n_);     // eigevectors
 
-    CHASE single(props, H.data(), ldh_, V.data(), Lambda.data());
+#ifdef HAS_UM
+    T *V, *H;
+    Base<T>* Lambda;
+    cudaMallocManaged((void**)&V, m_ * (nev + nex) * sizeof(T));
+    cudaMallocManaged((void**)&Lambda, (nev + nex) * sizeof(Base<T>));
+    cudaMallocManaged((void**)&H, ldh_ * n_ * sizeof(T));
+
+#ifdef HAS_TUNING
+    int device;
+    cudaGetDevice(&device);
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(V, m_ * (nev + nex) * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
+
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  device);
+    cudaMemAdvise(H, m_ * ldh_ * n_ * sizeof(T), cudaMemAdviseSetAccessedBy,
+                  cudaCpuDeviceId);
+
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetPreferredLocation, device);
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, device);
+    cudaMemAdvise(Lambda, (nev + nex) * sizeof(Base<T>),
+                  cudaMemAdviseSetAccessedBy, cudaCpuDeviceId);
+
+#endif
+#else
+    T* V = new T[m_ * (nev + nex)];           // Eigenvectors
+    Base<T>* Lambda = new Base<T>[nev + nex]; // Eigenvalues
+    T* H = new T[ldh_ * n_];                  // Eigenvectors
+#endif
+
+    // Creation of ChaseMPIDLA and ChaseMPIDLA_MGPU objects
+    CHASE single(props, H, ldh_, V, Lambda);
 
     /*Setup configure for ChASE*/
     auto& config = single.GetConfig();
@@ -92,7 +128,7 @@ int main(int argc, char** argv)
     config.SetApprox(false);
     /*Enable checking the symmetricity of matrices*/
     config.EnableSymCheck(true);
-    
+
     if (rank == 0)
         std::cout << "Solving " << idx_max << " symmetrized Clement matrices ("
                   << N << "x" << N
@@ -113,7 +149,7 @@ int main(int argc, char** argv)
             Clement[i + 1 + N * i] = std::sqrt(i * (N + 1 - i));
         if (i != N - 1)
             Clement[i + N * (i + 1)] = std::sqrt(i * (N + 1 - i));
-    }   
+    }
 
 #ifdef USE_BLOCK_CYCLIC
     /*local block number = mblocks x nblocks*/
@@ -154,8 +190,7 @@ int main(int argc, char** argv)
                 {
                     for (std::size_t p = 0; p < r_lens[i]; p++)
                     {
-                        H[(q + c_offs_l[j]) * m + p +
-                                              r_offs_l[i]] =
+                        H[(q + c_offs_l[j]) * m + p + r_offs_l[i]] =
                             Clement[(q + c_offs[j]) * N + p + r_offs[i]];
                     }
                 }
@@ -168,13 +203,12 @@ int main(int argc, char** argv)
         {
             for (std::size_t y = 0; y < ylen; y++)
             {
-                H[x + xlen * y] =
-                    Clement.at((xoff + x) + (yoff + y) * N);
+                H[x + xlen * y] = Clement.at((xoff + x) + (yoff + y) * N);
             }
         }
 #endif
 
-        if(!single.checkSymmetryEasy())
+        if (!single.checkSymmetryEasy())
         {
             single.symOrHermMatrix('L');
         }
@@ -224,4 +258,16 @@ int main(int argc, char** argv)
     }
 
     MPI_Finalize();
+
+#ifdef HAS_UM
+    /*Free the memory of the matrix*/
+    cudaFree(V);
+    cudaFree(H);
+    cudaFree(Lambda);
+#else
+    /*Free the memory of the matrix*/
+    delete[] V;
+    delete[] H;
+    delete[] Lambda;
+#endif
 }
