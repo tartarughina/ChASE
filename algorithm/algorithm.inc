@@ -312,7 +312,9 @@ std::size_t Algorithm<T>::lanczos(Chase<T>* single, int N, int numvec, int m,
     for (auto i = 1; i < idx; ++i)
     {
         auto j = i * (nevex / idx);
+        #ifndef HAS_UM
         single->Swap(i, j);
+        #endif
         std::swap(ritzv_[i], ritzv_[j]);
     }
 
@@ -587,7 +589,9 @@ void Algorithm<T>::solve(Chase<T>* single)
             if (ritzv_[i] > ritzv_[j])
             {
                 swap_kj(i, j, ritzv_);
+                #ifndef HAS_UM
                 single->Swap(i, j);
+                #endif
             }
         }
 #ifdef USE_NSIGHT
