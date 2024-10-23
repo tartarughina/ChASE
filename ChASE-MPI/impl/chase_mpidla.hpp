@@ -1422,10 +1422,11 @@ public:
         Memcpy(memcpy_mode[0], vv, C + m_ * i, m_ * sizeof(T));
         Memcpy(memcpy_mode[0], C + m_ * i, C + m_ * j, m_ * sizeof(T));
         Memcpy(memcpy_mode[0], C + m_ * j, vv, m_ * sizeof(T));
-
+#ifndef HAS_UM
         Memcpy(memcpy_mode[0], vv, C + m_ * i, m_ * sizeof(T));
         Memcpy(memcpy_mode[0], C + m_ * i, C + m_ * j, m_ * sizeof(T));
         Memcpy(memcpy_mode[0], C + m_ * j, vv, m_ * sizeof(T));
+#endif
     }
 
     void LanczosDos(std::size_t idx, std::size_t m, T* ritzVc) override
