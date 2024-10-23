@@ -65,9 +65,7 @@ std::size_t Algorithm<T>::calc_degrees(Chase<T>* single, std::size_t N,
                 swap_kj(k, j, ritzv);
                 swap_kj(k, j, resid);
                 swap_kj(k, j, residLast);
-                #ifndef HAS_UM
                 single->Swap(k + locked, j + locked);
-                #endif
             }
 
     return degrees[unconverged - 1];
@@ -116,9 +114,7 @@ std::size_t Algorithm<T>::locking(Chase<T>* single, std::size_t N,
             swap_kj(j, converged, resid);     // if we filter again
             swap_kj(j, converged, residLast); // if we filter again
             swap_kj(j, converged, Lritzv);
-            #ifndef HAS_UM
             single->Swap(j + locked, converged + locked);
-            #endif
         }
         converged++;
     }
@@ -316,9 +312,7 @@ std::size_t Algorithm<T>::lanczos(Chase<T>* single, int N, int numvec, int m,
     for (auto i = 1; i < idx; ++i)
     {
         auto j = i * (nevex / idx);
-        #ifndef HAS_UM
         single->Swap(i, j);
-        #endif
         std::swap(ritzv_[i], ritzv_[j]);
     }
 
@@ -593,9 +587,7 @@ void Algorithm<T>::solve(Chase<T>* single)
             if (ritzv_[i] > ritzv_[j])
             {
                 swap_kj(i, j, ritzv_);
-                #ifndef HAS_UM
                 single->Swap(i, j);
-                #endif
             }
         }
 #ifdef USE_NSIGHT

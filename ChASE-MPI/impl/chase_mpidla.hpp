@@ -1058,11 +1058,13 @@ public:
         nvtxRangePop();
 #endif
 
+#ifndef HAS_UM
         for (std::size_t i = 0; i < unconverged; ++i)
         {
             //    resid[i] = std::sqrt(resid_h[i]);
             resid[i] = std::sqrt(matrices_->Resid().ptr()[i + locked]);
         }
+#endif
     }
 
     void syherk(char uplo, char trans, std::size_t n, std::size_t k, T* alpha,
@@ -1422,11 +1424,10 @@ public:
         Memcpy(memcpy_mode[0], vv, C + m_ * i, m_ * sizeof(T));
         Memcpy(memcpy_mode[0], C + m_ * i, C + m_ * j, m_ * sizeof(T));
         Memcpy(memcpy_mode[0], C + m_ * j, vv, m_ * sizeof(T));
-#ifndef HAS_UM
-        Memcpy(memcpy_mode[0], vv, C + m_ * i, m_ * sizeof(T));
-        Memcpy(memcpy_mode[0], C + m_ * i, C + m_ * j, m_ * sizeof(T));
-        Memcpy(memcpy_mode[0], C + m_ * j, vv, m_ * sizeof(T));
-#endif
+
+        Memcpy(memcpy_mode[0], vv, C2 + m_ * i, m_ * sizeof(T));
+        Memcpy(memcpy_mode[0], C2 + m_ * i, C2 + m_ * j, m_ * sizeof(T));
+        Memcpy(memcpy_mode[0], C2 + m_ * j, vv, m_ * sizeof(T));
     }
 
     void LanczosDos(std::size_t idx, std::size_t m, T* ritzVc) override
