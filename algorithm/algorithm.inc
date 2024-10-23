@@ -65,7 +65,9 @@ std::size_t Algorithm<T>::calc_degrees(Chase<T>* single, std::size_t N,
                 swap_kj(k, j, ritzv);
                 swap_kj(k, j, resid);
                 swap_kj(k, j, residLast);
+                #ifndef HAS_UM
                 single->Swap(k + locked, j + locked);
+                #endif
             }
 
     return degrees[unconverged - 1];
@@ -114,7 +116,9 @@ std::size_t Algorithm<T>::locking(Chase<T>* single, std::size_t N,
             swap_kj(j, converged, resid);     // if we filter again
             swap_kj(j, converged, residLast); // if we filter again
             swap_kj(j, converged, Lritzv);
+            #ifndef HAS_UM
             single->Swap(j + locked, converged + locked);
+            #endif
         }
         converged++;
     }
